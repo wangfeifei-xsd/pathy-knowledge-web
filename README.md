@@ -14,6 +14,6 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 
 接口、数据目录、环境变量与启动方式以服务端为准，请阅读：
 
-**[pathy-knowledge-server README](../pathy-knowledge-server/README.md)**
+**[pathy-knowledge-server README](https://github.com/wangfeifei-xsd/pathy-knowledge-server)**
 
 本地开发时请先按该文档启动 API 服务，再在本目录执行 `npm install` 与 `npm run dev`。
