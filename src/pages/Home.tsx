@@ -1,9 +1,10 @@
 import { App, Button, Card, Descriptions, Space, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import { api } from '../api/client'
 import type { ConfigSummaryResponse } from '../api/types'
 
-const { Link, Text } = Typography
+const { Text } = Typography
 
 export function Home() {
   const { message } = App.useApp()
@@ -48,10 +49,38 @@ export function Home() {
           <Text type="secondary">暂无数据</Text>
         )}
       </Card>
+      <Card title="操作入口" size="small">
+        <Space wrap>
+          <RouterLink to="/layers">
+            <Button type="default">三层存储</Button>
+          </RouterLink>
+          <RouterLink to="/tasks/compile">
+            <Button type="default">编译任务</Button>
+          </RouterLink>
+          <RouterLink to="/tasks/lint">
+            <Button type="default">一致性报告</Button>
+          </RouterLink>
+          <RouterLink to="/tasks/polish">
+            <Button type="default">文本润色</Button>
+          </RouterLink>
+          <RouterLink to="/knowledge-recall/nl">
+            <Button type="default">召回知识</Button>
+          </RouterLink>
+          <RouterLink to="/knowledge-recall/dialogue-test">
+            <Button type="default">对话召回测试</Button>
+          </RouterLink>
+          <RouterLink to="/settings/llm">
+            <Button type="default">模型配置</Button>
+          </RouterLink>
+        </Space>
+      </Card>
       <Card title="API 文档" size="small">
-        <Link href="/docs" target="_blank" rel="noreferrer">
+        <Typography.Link href="/docs" target="_blank" rel="noreferrer">
           交互式 API 文档
-        </Link>
+        </Typography.Link>
+        <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
+          若前后端分端口部署，请使用后端地址的 <code>/docs</code>；本页为 dev 代理同域时有效。
+        </Typography.Text>
       </Card>
     </Space>
   )

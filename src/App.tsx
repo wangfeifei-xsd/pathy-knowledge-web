@@ -22,10 +22,12 @@ import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { setStoredToken } from './api/client'
 import { DialogueSummonTest } from './pages/knowledgeRecall/DialogueSummonTest'
 import { NaturalLanguageRecall } from './pages/knowledgeRecall/NaturalLanguageRecall'
+import { StopwordsConfig } from './pages/knowledgeRecall/StopwordsConfig'
 import { Home } from './pages/Home'
 import { Layers } from './pages/Layers'
 import { CompileTask } from './pages/llmTasks/CompileTask'
 import { LintReport } from './pages/llmTasks/LintReport'
+import { PolishTextPage } from './pages/llmTasks/PolishTextPage'
 import { ModelSettings } from './pages/ModelSettings'
 
 const { Header, Sider, Content } = Layout
@@ -37,6 +39,7 @@ function Shell() {
     if (loc.pathname.startsWith('/layers')) return ['/layers']
     if (loc.pathname.startsWith('/knowledge-recall/nl')) return ['/knowledge-recall/nl']
     if (loc.pathname.startsWith('/knowledge-recall/dialogue-test')) return ['/knowledge-recall/dialogue-test']
+    if (loc.pathname.startsWith('/knowledge-recall/stopwords')) return ['/knowledge-recall/stopwords']
     if (loc.pathname.startsWith('/tasks/lint')) return ['/tasks/lint']
     if (loc.pathname.startsWith('/tasks/compile') || loc.pathname === '/tasks') return ['/tasks/compile']
     if (loc.pathname.startsWith('/settings/llm')) return ['/settings/llm']
@@ -86,6 +89,10 @@ function Shell() {
                   key: '/knowledge-recall/dialogue-test',
                   label: <Link to="/knowledge-recall/dialogue-test">对话召回测试</Link>,
                 },
+                {
+                  key: '/knowledge-recall/stopwords',
+                  label: <Link to="/knowledge-recall/stopwords">停用词配置</Link>,
+                },
               ],
             },
             {
@@ -130,8 +137,10 @@ function Shell() {
               <Route path="/tasks" element={<Navigate to="/tasks/compile" replace />} />
               <Route path="/tasks/compile" element={<CompileTask />} />
               <Route path="/tasks/lint" element={<LintReport />} />
+              <Route path="/tasks/polish" element={<PolishTextPage />} />
               <Route path="/knowledge-recall/nl" element={<NaturalLanguageRecall />} />
               <Route path="/knowledge-recall/dialogue-test" element={<DialogueSummonTest />} />
+              <Route path="/knowledge-recall/stopwords" element={<StopwordsConfig />} />
               <Route path="/settings/llm" element={<ModelSettings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

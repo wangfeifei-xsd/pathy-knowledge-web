@@ -52,8 +52,8 @@ export function DialogueSummonTest() {
           message="流水线说明"
           description={
             <span>
-              在 <strong>wiki</strong> 编译层内按<strong>关键词重叠</strong>召回片段（非向量），拼成「参考资料」注入 Chat Completions，
-              再返回模型回答。召回阶段与「自然语言，召回知识」共用同一套服务端逻辑。
+              在 <strong>wiki</strong> 编译层用 <strong>BM25</strong> 召回片段（标题切块、停用词、标题加权；非向量），拼成「参考资料」注入 Chat Completions，
+              再返回模型回答。与「召回知识」共用服务端逻辑；<code>recall_method</code> 为 <code>bm25</code>。
             </span>
           }
         />
@@ -118,7 +118,7 @@ export function DialogueSummonTest() {
               {recallRes.context_truncated ? ' · 上下文已截断' : ''}
             </Paragraph>
             <Paragraph type="secondary">
-              解析词条：{recallRes.query_terms.length ? recallRes.query_terms.join('、') : '（无）'}
+              参与打分的词项（已去停用词）：{recallRes.query_terms.length ? recallRes.query_terms.join('、') : '（无，可能仅含停用词或无法分词）'}
             </Paragraph>
             <Paragraph strong style={{ marginTop: 8 }}>
               召回命中

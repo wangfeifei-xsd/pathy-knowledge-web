@@ -52,8 +52,9 @@ export function NaturalLanguageRecall() {
           message="说明"
           description={
             <span>
-              在 <strong>wiki</strong> 编译层内按<strong>关键词重叠</strong>召回片段（非向量），按预算拼接为「参考资料」正文；<strong>不调用
-              LLM</strong>。与「对话召回测试」共用服务端召回实现（<code>/api/v1/dialogue/recall</code>）。
+              在 <strong>wiki</strong> 编译层用 <strong>BM25</strong> 关键词召回（按 Markdown 标题切块、停用词过滤、标题路径命中加权；非向量），按预算拼接为「参考资料」正文；<strong>不调用
+              LLM</strong>。与「对话召回测试」共用服务端实现（<code>/api/v1/dialogue/recall</code>）。返回字段{' '}
+              <code>recall_method</code> 为 <code>bm25</code>。
             </span>
           }
         />
@@ -109,7 +110,7 @@ export function NaturalLanguageRecall() {
               {res.context_truncated ? ' · 上下文已截断' : ''}
             </Paragraph>
             <Paragraph type="secondary">
-              解析词条：{res.query_terms.length ? res.query_terms.join('、') : '（无）'}
+              参与打分的词项（已去停用词）：{res.query_terms.length ? res.query_terms.join('、') : '（无，可能仅含停用词或无法分词）'}
             </Paragraph>
             <Paragraph strong style={{ marginTop: 8 }}>
               召回命中

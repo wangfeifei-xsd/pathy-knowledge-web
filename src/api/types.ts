@@ -133,7 +133,7 @@ export interface PolishTextResponse {
   usage?: TaskUsage
 }
 
-/** 与服务端 DialogueRecallBaseParams 一致：召回扫描参数（不含 LLM system） */
+/** 与服务端 DialogueRecallBaseParams 一致：BM25 召回扫描参数（不含 LLM system） */
 export interface DialogueRecallScanRequest {
   query: string
   wiki_prefix?: string
@@ -179,4 +179,16 @@ export interface DialogueRecallTestResponse {
   context_truncated: boolean
   assistant_reply: string
   message: string
+}
+
+export interface RecallStopwordsResponse {
+  words: string[]
+  source: string
+  runtime_path: string
+  count: number
+  message: string
+}
+
+export interface RecallStopwordsUpdateRequest {
+  words: string[]
 }

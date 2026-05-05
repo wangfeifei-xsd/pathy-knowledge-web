@@ -1,4 +1,4 @@
-import { App, Alert, AutoComplete, Button, Card, Form, Input, InputNumber, Select, Space, Typography } from 'antd'
+import { App, Alert, AutoComplete, Button, Card, Form, Input, Select, Space, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import { api, apiErrorDetail } from '../../api/client'
 import type { CompileTaskResponse, LayerFileListResponse } from '../../api/types'
