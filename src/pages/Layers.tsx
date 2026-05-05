@@ -13,6 +13,7 @@ import {
   Select,
   Space,
   Table,
+  Tag,
   Typography,
   Upload,
 } from 'antd'
@@ -27,6 +28,7 @@ import type {
   LayerName,
   ListLayerResponse,
   PolishTextResponse,
+  WikiEmbedResponse,
 } from '../api/types'
 
 type UploadCustomRequestOpt = Parameters<NonNullable<UploadProps['customRequest']>>[0]
@@ -114,6 +116,7 @@ export function Layers() {
   const [uploading, setUploading] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const [batchDeleting, setBatchDeleting] = useState(false)
+  const [embeddingPath, setEmbeddingPath] = useState<string | null>(null)
 
   const [schemaModalOpen, setSchemaModalOpen] = useState(false)
   const [schemaRelPath, setSchemaRelPath] = useState('AGENTS.md')
@@ -248,17 +251,16 @@ export function Layers() {
       {
         title: '名称',
         dataIndex: 'name',
-        ellipsis: true,
+        width: 110,
         render: (v: string, row) => {
           const label = `${v}${row.is_dir ? '/' : ''}`
           return (
             <Button
               type="link"
-              block
               onClick={() => enterDir(row)}
-              style={{ padding: 0, height: 'auto', textAlign: 'left' }}
+              style={{ padding: 0, height: 'auto', maxWidth: '100%' }}
             >
-              <Text ellipsis={{ tooltip: label }} style={{ width: '100%', display: 'block' }}>
+              <Text ellipsis={{ tooltip: label }} style={{ maxWidth: 90, display: 'inline-block' }}>
                 {label}
               </Text>
             </Button>
@@ -277,26 +279,62 @@ export function Layers() {
         render: (s: number | null) => (s == null ? '—' : s),
       },
       {
+        title: '嵌入状态',
+        width: 100,
+        render: (_, row) => {
+          if (layer !== 'wiki' || row.is_dir) return '—'
+          if (row.embedding_status === 'embedded') return <Tag color="success">已嵌入</Tag>
+          if (row.embedding_status === 'stale') return <Tag color="warning">需重嵌入</Tag>
+          return <Tag>未嵌入</Tag>
+        },
+      },
+      {
         title: '操作',
-        width: 72,
+        width: 150,
         align: 'center',
         render: (_, row) => (
-          <Popconfirm
-            title={row.is_dir ? '删除该目录？' : '删除该文件？'}
-            description={<span style={{ wordBreak: 'break-all' }}>{entryApiPath(row)}</span>}
-            onConfirm={() => void deleteEntry(row)}
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-          >
-            <Button type="link" danger size="small" style={{ padding: 0 }}>
-              删除
-            </Button>
-          </Popconfirm>
+          <Space size={6}>
+            {layer === 'wiki' && !row.is_dir ? (
+              <Button
+                type="link"
+                size="small"
+                loading={embeddingPath === row.path}
+                disabled={row.embedding_status === 'embedded'}
+                onClick={async () => {
+                  try {
+                    setEmbeddingPath(row.path)
+                    const p = row.path.replace(/\/$/, '')
+                    const { data } = await api.post<WikiEmbedResponse>('/api/v1/wiki/embed', { path: p })
+                    message.success(`已嵌入 ${data.chunk_count} 个 chunk`)
+                    void loadList()
+                  } catch (e) {
+                    message.error(apiErrorDetail(e) ?? '嵌入失败')
+                  } finally {
+                    setEmbeddingPath(null)
+                  }
+                }}
+                style={{ padding: 0 }}
+              >
+                嵌入
+              </Button>
+            ) : null}
+            <Popconfirm
+              title={row.is_dir ? '删除该目录？' : '删除该文件？'}
+              description={<span style={{ wordBreak: 'break-all' }}>{entryApiPath(row)}</span>}
+              onConfirm={() => void deleteEntry(row)}
+              okText="删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+            >
+              <Button type="link" danger size="small" style={{ padding: 0 }}>
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
         ),
       },
     ],
-    [deleteEntry, enterDir],
+    [deleteEntry, embeddingPath, enterDir, layer, loadList, message],
   )
 
   const openSchemaCreate = useCallback(() => {
@@ -554,6 +592,7 @@ export function Layers() {
             columns={columns}
             dataSource={entries}
             pagination={false}
+            scroll={{ x: 760 }}
             rowSelection={{
               selectedRowKeys,
               onChange: setSelectedRowKeys,

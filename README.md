@@ -23,12 +23,14 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 | 路由 | 说明 |
 |------|------|
 | `/` | 配置摘要、快捷入口 |
-| `/layers` | 三层存储（raw/wiki/schema 浏览、编辑、上传） |
+| `/layers` | 三层存储（raw/wiki/schema 浏览、编辑、上传；wiki 含嵌入状态与手动嵌入） |
 | `/tasks/compile` | 编译任务 |
 | `/tasks/lint` | 一致性报告 |
 | `/tasks/polish` | 文本润色（`POST /api/v1/tasks/polish-text`） |
-| `/knowledge-recall/nl` | 召回知识（BM25，仅召回） |
-| `/knowledge-recall/dialogue-test` | 对话召回测试（召回 + LLM） |
-| `/settings/llm` | 模型配置与连通性探测 |
+| `/knowledge-recall/nl` | 召回知识（BM25 + 向量双路召回，仅召回） |
+| `/knowledge-recall/dialogue-test` | 对话召回测试（双路召回 + rerank + LLM） |
+| `/settings/llm` | LLM 模型配置与连通性探测 |
+| `/settings/embedding` | Embedding 模型配置与连通性探测 |
+| `/settings/rerank` | Rerank 模型配置与连通性探测 |
 
 开发时 Vite 将 `/api`、`/docs` 等代理到后端（见 `vite.config.ts`）；侧栏可填写与服务端 `API_KEY` 一致的 Bearer。

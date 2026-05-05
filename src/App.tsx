@@ -29,6 +29,7 @@ import { CompileTask } from './pages/llmTasks/CompileTask'
 import { LintReport } from './pages/llmTasks/LintReport'
 import { PolishTextPage } from './pages/llmTasks/PolishTextPage'
 import { ModelSettings } from './pages/ModelSettings'
+import { SimpleModelSettings } from './pages/SimpleModelSettings'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
@@ -43,6 +44,8 @@ function Shell() {
     if (loc.pathname.startsWith('/tasks/lint')) return ['/tasks/lint']
     if (loc.pathname.startsWith('/tasks/compile') || loc.pathname === '/tasks') return ['/tasks/compile']
     if (loc.pathname.startsWith('/settings/llm')) return ['/settings/llm']
+    if (loc.pathname.startsWith('/settings/embedding')) return ['/settings/embedding']
+    if (loc.pathname.startsWith('/settings/rerank')) return ['/settings/rerank']
     return ['/']
   }, [loc.pathname])
 
@@ -63,7 +66,7 @@ function Shell() {
         <Menu
           mode="inline"
           selectedKeys={selected}
-          defaultOpenKeys={['llm-tasks', 'knowledge-recall']}
+          defaultOpenKeys={['llm-tasks', 'knowledge-recall', 'model-settings']}
           items={[
             { key: '/', icon: <HomeOutlined />, label: <Link to="/">概览</Link> },
             { key: '/layers', icon: <FolderOpenOutlined />, label: <Link to="/layers">三层存储</Link> },
@@ -96,9 +99,20 @@ function Shell() {
               ],
             },
             {
-              key: '/settings/llm',
+              key: 'model-settings',
               icon: <SettingOutlined />,
-              label: <Link to="/settings/llm">模型配置</Link>,
+              label: '模型配置',
+              children: [
+                { key: '/settings/llm', label: <Link to="/settings/llm">LLM模型配置</Link> },
+                {
+                  key: '/settings/embedding',
+                  label: <Link to="/settings/embedding">Embedding模型配置</Link>,
+                },
+                {
+                  key: '/settings/rerank',
+                  label: <Link to="/settings/rerank">Rerank模型配置</Link>,
+                },
+              ],
             },
           ]}
         />
@@ -142,6 +156,30 @@ function Shell() {
               <Route path="/knowledge-recall/dialogue-test" element={<DialogueSummonTest />} />
               <Route path="/knowledge-recall/stopwords" element={<StopwordsConfig />} />
               <Route path="/settings/llm" element={<ModelSettings />} />
+              <Route
+                path="/settings/embedding"
+                element={
+                  <SimpleModelSettings
+                    title="Embedding模型配置"
+                    endpoint="/api/v1/settings/embedding"
+                    testEndpoint="/api/v1/settings/embedding/test"
+                    lockKey="embedding_model"
+                    keyFileLabel=".pathy/embedding_api_key"
+                  />
+                }
+              />
+              <Route
+                path="/settings/rerank"
+                element={
+                  <SimpleModelSettings
+                    title="Rerank模型配置"
+                    endpoint="/api/v1/settings/rerank"
+                    testEndpoint="/api/v1/settings/rerank/test"
+                    lockKey="rerank_model"
+                    keyFileLabel=".pathy/rerank_api_key"
+                  />
+                }
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

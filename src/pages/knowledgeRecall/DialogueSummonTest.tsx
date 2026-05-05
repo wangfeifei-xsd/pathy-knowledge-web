@@ -8,6 +8,8 @@ const { Paragraph } = Typography
 const SCAN_DEFAULTS = {
   wiki_prefix: '',
   max_files: 80,
+  bm25_top_n: 10,
+  vector_top_n: 10,
   top_k_chunks: 6,
   chunk_max_chars: 1200,
   context_budget_chars: 12000,
@@ -27,6 +29,8 @@ export function DialogueSummonTest() {
         query: v.query,
         wiki_prefix: v.wiki_prefix || undefined,
         max_files: v.max_files,
+        bm25_top_n: v.bm25_top_n,
+        vector_top_n: v.vector_top_n,
         top_k_chunks: v.top_k_chunks,
         chunk_max_chars: v.chunk_max_chars,
         context_budget_chars: v.context_budget_chars,
@@ -52,8 +56,9 @@ export function DialogueSummonTest() {
           message="流水线说明"
           description={
             <span>
-              在 <strong>wiki</strong> 编译层用 <strong>BM25</strong> 召回片段（标题切块、停用词、标题加权；非向量），拼成「参考资料」注入 Chat Completions，
-              再返回模型回答。与「召回知识」共用服务端逻辑；<code>recall_method</code> 为 <code>bm25</code>。
+              在 <strong>wiki</strong> 编译层执行 <strong>BM25 + 向量</strong> 双路召回（各自 topN），合并去重后轻量
+              rerank，取 topK 片段注入 Chat Completions，再返回模型回答。与「召回知识」共用服务端逻辑；
+              <code>recall_method</code> 为 <code>hybrid_bm25_vector</code>。
             </span>
           }
         />
@@ -72,7 +77,7 @@ export function DialogueSummonTest() {
             items={[
               {
                 key: 'optional-recall',
-                label: '可选参数（wiki 前缀、扫描范围与分块）',
+                label: '可选参数（wiki 前缀、双路 topN、topK 与分块）',
                 children: (
                   <>
                     <Form.Item name="wiki_prefix" label="wiki 子路径前缀（可选）">
@@ -82,7 +87,13 @@ export function DialogueSummonTest() {
                       <Form.Item name="max_files" label="最多扫描文件数" style={{ minWidth: 160 }}>
                         <InputNumber min={1} max={500} />
                       </Form.Item>
-                      <Form.Item name="top_k_chunks" label="召回片段数" style={{ minWidth: 140 }}>
+                      <Form.Item name="bm25_top_n" label="BM25 候选 topN" style={{ minWidth: 160 }}>
+                        <InputNumber min={1} max={100} />
+                      </Form.Item>
+                      <Form.Item name="vector_top_n" label="向量候选 topN" style={{ minWidth: 160 }}>
+                        <InputNumber min={1} max={100} />
+                      </Form.Item>
+                      <Form.Item name="top_k_chunks" label="最终注入 topK" style={{ minWidth: 140 }}>
                         <InputNumber min={1} max={32} />
                       </Form.Item>
                       <Form.Item name="chunk_max_chars" label="单片段最大字符" style={{ minWidth: 160 }}>

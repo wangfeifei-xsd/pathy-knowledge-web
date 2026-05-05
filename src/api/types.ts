@@ -33,6 +33,25 @@ export interface LLMSettingsResponse {
   runtime_llm_json: string
 }
 
+export interface BasicModelSettingsResponse {
+  model: string
+  model_source: LLMFieldSource
+  openai_base_url: string | null
+  openai_base_url_source: LLMFieldSource
+  openai_timeout_seconds: number
+  openai_timeout_source: LLMFieldSource
+  openai_max_tokens: number
+  openai_max_tokens_source: LLMFieldSource
+  openai_api_key_configured: boolean
+  env_locks: Record<string, boolean>
+  runtime_llm_json: string
+}
+
+export interface BasicModelSettingsUpdateResult {
+  settings: BasicModelSettingsResponse
+  warnings: string[]
+}
+
 export interface LLMSettingsUpdateRequest {
   openai_model?: string
   openai_base_url?: string
@@ -66,6 +85,7 @@ export interface DirEntry {
   path: string
   is_dir: boolean
   size: number | null
+  embedding_status?: 'embedded' | 'stale' | 'not_embedded' | null
 }
 
 export interface ListLayerResponse {
@@ -133,11 +153,13 @@ export interface PolishTextResponse {
   usage?: TaskUsage
 }
 
-/** 与服务端 DialogueRecallBaseParams 一致：BM25 召回扫描参数（不含 LLM system） */
+/** 与服务端 DialogueRecallBaseParams 一致：双路召回扫描参数（不含 LLM system） */
 export interface DialogueRecallScanRequest {
   query: string
   wiki_prefix?: string
   max_files?: number
+  bm25_top_n?: number
+  vector_top_n?: number
   top_k_chunks?: number
   chunk_max_chars?: number
   context_budget_chars?: number
@@ -191,4 +213,12 @@ export interface RecallStopwordsResponse {
 
 export interface RecallStopwordsUpdateRequest {
   words: string[]
+}
+
+export interface WikiEmbedResponse {
+  path: string
+  chunk_count: number
+  model: string
+  updated_at: string
+  message: string
 }

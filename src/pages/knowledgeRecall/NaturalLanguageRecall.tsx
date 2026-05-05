@@ -8,6 +8,8 @@ const { Paragraph } = Typography
 const SCAN_DEFAULTS = {
   wiki_prefix: '',
   max_files: 80,
+  bm25_top_n: 10,
+  vector_top_n: 10,
   top_k_chunks: 6,
   chunk_max_chars: 1200,
   context_budget_chars: 12000,
@@ -27,6 +29,8 @@ export function NaturalLanguageRecall() {
         query: v.query,
         wiki_prefix: v.wiki_prefix || undefined,
         max_files: v.max_files,
+        bm25_top_n: v.bm25_top_n,
+        vector_top_n: v.vector_top_n,
         top_k_chunks: v.top_k_chunks,
         chunk_max_chars: v.chunk_max_chars,
         context_budget_chars: v.context_budget_chars,
@@ -52,9 +56,10 @@ export function NaturalLanguageRecall() {
           message="说明"
           description={
             <span>
-              在 <strong>wiki</strong> 编译层用 <strong>BM25</strong> 关键词召回（按 Markdown 标题切块、停用词过滤、标题路径命中加权；非向量），按预算拼接为「参考资料」正文；<strong>不调用
-              LLM</strong>。与「对话召回测试」共用服务端实现（<code>/api/v1/dialogue/recall</code>）。返回字段{' '}
-              <code>recall_method</code> 为 <code>bm25</code>。
+              在 <strong>wiki</strong> 编译层执行 <strong>BM25 + 向量</strong> 双路召回（各自 topN），合并去重后做轻量
+              rerank，再取 topK 按预算拼接为「参考资料」正文；<strong>不调用 LLM</strong>。与「对话召回测试」共用服务端实现（
+              <code>/api/v1/dialogue/recall</code>）。返回字段 <code>recall_method</code> 为{' '}
+              <code>hybrid_bm25_vector</code>。
             </span>
           }
         />
@@ -73,7 +78,7 @@ export function NaturalLanguageRecall() {
             items={[
               {
                 key: 'optional-scan',
-                label: '可选参数（wiki 前缀、扫描范围与分块）',
+                label: '可选参数（wiki 前缀、双路 topN、topK 与分块）',
                 children: (
                   <>
                     <Form.Item name="wiki_prefix" label="wiki 子路径前缀（可选）">
@@ -83,7 +88,13 @@ export function NaturalLanguageRecall() {
                       <Form.Item name="max_files" label="最多扫描文件数" style={{ minWidth: 160 }}>
                         <InputNumber min={1} max={500} />
                       </Form.Item>
-                      <Form.Item name="top_k_chunks" label="召回片段数" style={{ minWidth: 140 }}>
+                      <Form.Item name="bm25_top_n" label="BM25 候选 topN" style={{ minWidth: 160 }}>
+                        <InputNumber min={1} max={100} />
+                      </Form.Item>
+                      <Form.Item name="vector_top_n" label="向量候选 topN" style={{ minWidth: 160 }}>
+                        <InputNumber min={1} max={100} />
+                      </Form.Item>
+                      <Form.Item name="top_k_chunks" label="最终注入 topK" style={{ minWidth: 140 }}>
                         <InputNumber min={1} max={32} />
                       </Form.Item>
                       <Form.Item name="chunk_max_chars" label="单片段最大字符" style={{ minWidth: 160 }}>
