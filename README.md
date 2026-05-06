@@ -34,3 +34,13 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 | `/settings/rerank` | Rerank 模型配置与连通性探测 |
 
 开发时 Vite 将 `/api`、`/docs` 等代理到后端（见 `vite.config.ts`）；侧栏可填写与服务端 `API_KEY` 一致的 Bearer。
+
+## Windows 本地部署
+
+在 Windows 项目目录中，使用系统自带 PowerShell 执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-web.ps1 -Port 5174 -ApiTarget "http://127.0.0.1:8766"
+```
+
+启动后浏览器访问前端地址：`http://127.0.0.1:5174`。
