@@ -58,9 +58,8 @@ export function NaturalLanguageRecall() {
           description={
             <span>
               在 <strong>wiki</strong> 编译层执行 <strong>BM25 + 向量</strong> 双路召回（各自 topN），合并去重后做轻量
-              rerank，再取 topK 按预算拼接为「参考资料」正文；<strong>不调用 LLM</strong>。与「对话召回测试」共用服务端实现（
-              <code>/api/v1/dialogue/recall</code>）。返回字段 <code>recall_method</code> 为{' '}
-              <code>hybrid_bm25_vector</code>。
+              rerank，再取 topK 按预算拼接为「参考资料」正文；<strong>不调用 LLM</strong>。接口路径：
+              <code>/api/v1/dialogue/recall</code>。
             </span>
           }
         />

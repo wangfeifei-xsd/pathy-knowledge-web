@@ -1,25 +1,14 @@
-import {
-  App as AntApp,
-  ConfigProvider,
-  Input,
-  Layout,
-  Menu,
-  Space,
-  theme as antdTheme,
-  Typography,
-} from 'antd'
+import { App as AntApp, ConfigProvider, Layout, Menu, Space, theme as antdTheme, Typography } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import {
   ApiOutlined,
-  CloudOutlined,
   FileSearchOutlined,
   FolderOpenOutlined,
   HomeOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { setStoredToken } from '../api/client'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
@@ -38,8 +27,6 @@ export function Shell() {
     if (loc.pathname.startsWith('/settings/rerank')) return ['/settings/rerank']
     return ['/']
   }, [loc.pathname])
-
-  const [tokenDraft, setTokenDraft] = useState(() => localStorage.getItem('pathy_api_token') ?? '')
 
   return (
     <ConfigProvider locale={zhCN} theme={{ algorithm: antdTheme.defaultAlgorithm }}>
@@ -108,18 +95,6 @@ export function Shell() {
                 },
               ]}
             />
-            <div style={{ padding: 12, borderTop: '1px solid #f0f0f0' }}>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
-                <CloudOutlined /> 可选 Bearer
-              </Text>
-              <Input.Password
-                value={tokenDraft}
-                onChange={(e) => setTokenDraft(e.target.value)}
-                onBlur={() => setStoredToken(tokenDraft.trim() || null)}
-                placeholder="与 API_KEY 一致时填写"
-                size="small"
-              />
-            </div>
           </Sider>
           <Layout>
             <Header

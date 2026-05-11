@@ -35,6 +35,9 @@ type UploadCustomRequestOpt = Parameters<NonNullable<UploadProps['customRequest'
 
 const { Text } = Typography
 
+/** 左侧「浏览」列表表体固定高度（px），超出在表内滚动、表头保持可见 */
+const LAYERS_BROWSER_TABLE_SCROLL_Y = 520
+
 function entryApiPath(row: DirEntry): string {
   return row.path.replace(/\/$/, '')
 }
@@ -458,37 +461,44 @@ export function Layers() {
       <Alert
         type="info"
         showIcon
-        message="使用流程（与需求方案一致）"
+        message="使用流程"
         description={
           <ol style={{ margin: 0, paddingLeft: 20, marginBottom: 0 }}>
             <li>
-              <strong>raw 原始层</strong>：放入未编译的素材（笔记、剪藏、Markdown）。在「浏览」卡片右上角使用 <strong>上传</strong>（默认保存到当前面包屑目录 + 原文件名）；正文超过 <strong>2500 字（Unicode 字符）</strong>时会<strong>自动拆成多个文件</strong>（如{' '}
-              <code>笔记-1.md</code>、<code>笔记-2.md</code>）。也可点开 <code>*.md</code> 编辑保存；或通过「API 文档」、直接向服务器 <code>data/raw</code> 拷贝文件。
+              <strong>raw 原始层</strong>：放入未编译的素材（纯文本）。在「浏览」卡片右上角使用 <strong>上传</strong>（默认保存到当前目录）；正文超过 <strong>2500 字（Unicode 字符）</strong>时会<strong>自动拆成多个文件</strong>（如{' '}
+              <code>笔记-1.md</code>、<code>笔记-2.md</code>）。也可点开 <code>*.md</code> 编辑保存。
             </li>
             <li>
-              <strong>schema 规范层</strong>（建议）：切换到本层后点右上角 <strong>创建</strong>，在弹出框中编辑模板正文；可先 <strong>AI 润色</strong> 再保存到
-              <code>schema/</code>。编译 / Lint 会读入这些约定。
+              <strong>schema 规范层</strong>：切换到本层后点右上角 <strong>创建</strong>，在弹出框中编辑模板正文；可先 <strong>AI 润色</strong> 再保存到
+              <code>schema/</code>。编译 / Lint 时会读入这些约定。
             </li>
             <li>
-              打开侧栏 <strong>LLM 任务 → 编译任务</strong>：填写 raw 内 <code>input_paths</code> 与 wiki 内 <code>output_path</code>，把素材整理为 wiki
-              型条目并写入 <strong>wiki 编译层</strong>。需要已配置 API 密钥与模型。
+              侧栏 <strong>LLM 任务 → 编译任务</strong>：填写 raw 内 <code>input_paths</code> 与 wiki 内 <code>output_path</code>，将素材编译为 wiki
+              条目并写入 <strong>wiki 编译层</strong>。需要已配置 API 密钥与模型。
             </li>
             <li>
-              可选：侧栏 <strong>LLM 任务 → 一致性报告</strong> 对编译结果做 Lint，检查链接、结构等。全程数据在服务器 <code>data/</code> 下，本页负责浏览与轻量编辑。
+              侧栏 <strong>LLM 任务 → 一致性报告</strong>：对编译结果做 Lint，检查链接、结构等。全程数据在服务器 <code>data/</code> 下。
             </li>
           </ol>
         }
       />
-    <Row gutter={16}>
-      <Col xs={24} lg={10}>
+    <Row gutter={16} align="stretch">
+      <Col xs={24} lg={10} style={{ display: 'flex', minWidth: 0 }}>
         <Card
           title="浏览"
+          style={{ flex: 1, width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
           styles={{
             header: {
               paddingBlock: 14,
               paddingInline: 16,
               minHeight: 56,
               alignItems: 'center',
+            },
+            body: {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
             },
           }}
           extra={
@@ -564,10 +574,10 @@ export function Layers() {
                 </a>
               ),
             }))}
-            style={{ marginBottom: 12 }}
+            style={{ marginBottom: 12, flexShrink: 0 }}
           />
           {selectedRowKeys.length > 0 && (
-            <Space wrap style={{ marginBottom: 12 }}>
+            <Space wrap style={{ marginBottom: 12, flexShrink: 0 }}>
               <Popconfirm
                 title={`删除选中的 ${selectedRowKeys.length} 项？`}
                 description="删除后不可恢复（目录将递归删除）"
@@ -585,25 +595,36 @@ export function Layers() {
               </Button>
             </Space>
           )}
-          <Table<DirEntry>
-            size="small"
-            rowKey={(r) => r.path}
-            loading={listLoading}
-            columns={columns}
-            dataSource={entries}
-            pagination={false}
-            scroll={{ x: 760 }}
-            rowSelection={{
-              selectedRowKeys,
-              onChange: setSelectedRowKeys,
-              preserveSelectedRowKeys: false,
-            }}
-          />
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <Table<DirEntry>
+              size="small"
+              rowKey={(r) => r.path}
+              loading={listLoading}
+              columns={columns}
+              dataSource={entries}
+              pagination={false}
+              scroll={{ x: 760, y: LAYERS_BROWSER_TABLE_SCROLL_Y }}
+              rowSelection={{
+                selectedRowKeys,
+                onChange: setSelectedRowKeys,
+                preserveSelectedRowKeys: false,
+              }}
+            />
+          </div>
         </Card>
       </Col>
-      <Col xs={24} lg={14}>
+      <Col xs={24} lg={14} style={{ display: 'flex', minWidth: 0 }}>
         <Card
           title={filePath ? `编辑：${filePath}` : '未选择文件'}
+          style={{ flex: 1, width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
+          styles={{
+            body: {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
           extra={
             <Button type="primary" disabled={!filePath} loading={saving} onClick={() => void saveFile()}>
               保存
@@ -611,17 +632,24 @@ export function Layers() {
           }
         >
           {fileMeta && (
-            <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 8, flexShrink: 0 }}>
               UTF-8 · {fileMeta.size} 字节
             </Text>
           )}
-          <Input.TextArea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={22}
-            placeholder="选择左侧文件进行查看或编辑"
-            style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
-          />
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <Input.TextArea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="选择左侧文件进行查看或编辑"
+              style={{
+                flex: 1,
+                minHeight: 280,
+                width: '100%',
+                resize: 'none',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              }}
+            />
+          </div>
         </Card>
       </Col>
     </Row>

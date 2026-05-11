@@ -10,13 +10,13 @@ export type LLMFieldSource = 'env' | 'file' | 'default'
 export interface ConfigSummaryResponse {
   data_root: string
   data_root_resolved: string
-  openai_base_url_configured: boolean
-  openai_model: string
-  openai_timeout_seconds: number
-  openai_max_tokens: number
-  openai_api_key_configured: boolean
+  llm_base_url: string | null
+  llm_model: string
+  embedding_base_url: string | null
+  embedding_model: string
+  rerank_base_url: string | null
+  rerank_model: string
   layers: string[]
-  auth_enabled: boolean
 }
 
 export interface LLMSettingsResponse {

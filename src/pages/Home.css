@@ -1,0 +1,24 @@
+/* 配置摘要 Descriptions（bordered）：固定表格列宽 + 内容列可缩，单行省略才生效 */
+.home-config-summary.ant-descriptions .ant-descriptions-view > table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.home-config-summary.ant-descriptions .ant-descriptions-item-label {
+  width: 200px;
+  vertical-align: top;
+}
+
+/* 与列宽算法配合：让「值」列在 fixed 布局下吃掉剩余宽度 */
+.home-config-summary.ant-descriptions td.ant-descriptions-item-content {
+  max-width: 0;
+  vertical-align: middle;
+}
+
+/* bordered 时正文包在 td > span 里，需块级 + min-width:0 才能把省略传给子节点 */
+.home-config-summary.ant-descriptions td.ant-descriptions-item-content > span {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}

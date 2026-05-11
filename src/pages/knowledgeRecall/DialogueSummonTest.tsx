@@ -58,8 +58,7 @@ export function DialogueSummonTest() {
           description={
             <span>
               在 <strong>wiki</strong> 编译层执行 <strong>BM25 + 向量</strong> 双路召回（各自 topN），合并去重后轻量
-              rerank，取 topK 片段注入 Chat Completions，再返回模型回答。与「召回知识」共用服务端逻辑；
-              <code>recall_method</code> 为 <code>hybrid_bm25_vector</code>。
+              rerank，取 topK 片段注入 Chat Completions，再返回模型回答。
             </span>
           }
         />

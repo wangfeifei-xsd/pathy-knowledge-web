@@ -38,7 +38,7 @@ export function CompileTask() {
       setWikiPaths(w.data.paths)
       setPathsTruncated({ raw: r.data.truncated, wiki: w.data.truncated })
     } catch (e) {
-      message.error('加载存储路径列表失败（检查服务是否启动、Bearer 是否与 API_KEY 一致）')
+      message.error('加载存储路径列表失败（请检查服务是否已启动）')
       console.error(e)
     } finally {
       setPathsLoading(false)
@@ -101,15 +101,24 @@ export function CompileTask() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="路径说明"
+          message="使用流程"
           description={
-            <span>
-              原始层：下拉来自数据目录下<strong>已存在的 raw 文件</strong>。编译输出：相对{' '}
-              <strong>wiki 层根目录</strong>（一般为 <code>pathy-knowledge-server/data/wiki/</code>
-              ）。选择 raw 后会按<strong>所选列表中的第一个文件</strong>自动生成路径（如{' '}
-              <code>小视知识库V1-1.txt</code> → <code>小视知识库V1-1.md</code>，带子目录则保留）；仍可手动修改；列表为快捷参考，同名则覆盖。未选素材时为{' '}
-              <code>{DEFAULT_COMPILE_OUTPUT_WIKI_PATH}</code>。
-            </span>
+            <ul style={{ margin: 0, paddingLeft: 20, marginBottom: 0 }}>
+              <li>
+                原始层：下拉框中的文件来自数据目录下<strong>已存在的 raw 文件</strong>。
+              </li>
+              <li>
+                编译输出：相对 <strong>wiki 层根目录</strong>（一般为{' '}
+                <code> 项目根目录/data/wiki/ </code>）。
+              </li>
+              <li>
+                选择 raw 后会按<strong>所选列表中的第一个文件</strong>自动生成路径（如{' '}
+                <code>小视知识库V1-1.txt</code> → <code>小视知识库V1-1.md</code>，带子目录则保留）；仍可手动修改；同名文件会覆盖。
+              </li>
+              <li>
+                未选素材时输出路径默认为 <code>{DEFAULT_COMPILE_OUTPUT_WIKI_PATH}</code>。
+              </li>
+            </ul>
           }
         />
         <Form form={form} layout="vertical" initialValues={{ output_path: DEFAULT_COMPILE_OUTPUT_WIKI_PATH }}>

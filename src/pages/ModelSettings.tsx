@@ -147,7 +147,7 @@ export function ModelSettings() {
           <span>
             进程环境变量（如 <code>OPENAI_MODEL</code>）优先于数据目录下{' '}
             <code>{detail?.runtime_llm_json ?? '.pathy/llm.json'}</code>。未列在环境变量中的项可通过本页保存到运行时文件。API
-            密钥可来自环境变量、<code>.env</code> 或 <code>.pathy/openai_api_key</code>（本页可写入后者）。
+            密钥可来自环境变量、<code>.env</code> 或 <code>.pathy/openai_api_key</code>。
           </span>
         }
       />

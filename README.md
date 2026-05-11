@@ -33,7 +33,7 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 | `/settings/embedding` | Embedding 模型配置与连通性探测 |
 | `/settings/rerank` | Rerank 模型配置与连通性探测 |
 
-开发时 Vite 将 `/api`、`/docs` 等代理到后端（见 `vite.config.ts`）；侧栏可填写与服务端 `API_KEY` 一致的 Bearer。
+开发时 Vite 将 `/api`、`/docs` 等代理到后端（见 `vite.config.ts`）。
 
 ## Windows 本地部署
 
