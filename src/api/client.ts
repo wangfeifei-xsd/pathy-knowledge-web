@@ -23,9 +23,16 @@ export function setStoredToken(token: string | null): void {
   else localStorage.removeItem(STORAGE_KEY)
 }
 
+/** 与 agent-plant-ui 一致：由 `VITE_API_BASE_URL` 控制；开发环境可留空走 Vite 代理。 */
+const BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? '').trim()
+const TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT ?? 120_000) || 120_000
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE ?? '',
-  timeout: 120_000,
+  baseURL: BASE_URL,
+  timeout: TIMEOUT,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 })
 
 api.interceptors.request.use((config) => {
