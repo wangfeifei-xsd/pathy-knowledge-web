@@ -2,6 +2,7 @@ import { App, Alert, Button, Card, Collapse, Form, Input, InputNumber, Space, Ta
 import { useState } from 'react'
 import { api, apiErrorDetail } from '../../api/client'
 import type { DialogueRecallRequest, DialogueRecallResponse } from '../../api/types'
+import { RecallLaneSummary } from './recallLaneUi'
 
 const { Paragraph } = Typography
 
@@ -120,6 +121,10 @@ export function NaturalLanguageRecall() {
               {res.recall_method} · 扫描文件：{res.files_scanned}
               {res.context_truncated ? ' · 上下文已截断' : ''}
             </Paragraph>
+            <Space direction="vertical" size={4} style={{ width: '100%', marginBottom: 8 }}>
+              <RecallLaneSummary title="BM25" lane={res.bm25} />
+              <RecallLaneSummary title="向量" lane={res.vector} showEmbeddingModel />
+            </Space>
             <Paragraph type="secondary">
               参与打分的词项（已去停用词）：{res.query_terms.length ? res.query_terms.join('、') : '（无，可能仅含停用词或无法分词）'}
             </Paragraph>

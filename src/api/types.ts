@@ -178,12 +178,22 @@ export interface DialogueRecallHit {
   snippet: string
 }
 
+/** 与 DialogueRecallLaneStatus 一致：BM25 / 向量单路状态 */
+export interface DialogueRecallLaneStatus {
+  status: string
+  candidate_count: number
+  detail?: string | null
+  embedding_model?: string | null
+}
+
 export interface DialogueRecallResponse {
   user_query: string
   recall_method: string
   query_terms: string[]
   files_scanned: number
   recall_hits: DialogueRecallHit[]
+  bm25: DialogueRecallLaneStatus
+  vector: DialogueRecallLaneStatus
   injected_context: string
   context_truncated: boolean
   message: string
@@ -197,6 +207,8 @@ export interface DialogueRecallTestResponse {
   query_terms: string[]
   files_scanned: number
   recall_hits: DialogueRecallHit[]
+  bm25: DialogueRecallLaneStatus
+  vector: DialogueRecallLaneStatus
   injected_context: string
   context_truncated: boolean
   assistant_reply: string
