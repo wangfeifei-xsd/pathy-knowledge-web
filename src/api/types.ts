@@ -234,3 +234,27 @@ export interface WikiEmbedResponse {
   updated_at: string
   message: string
 }
+
+/** 与后端 DataFolderTreeNode 一致 */
+export interface DataFolderTreeNode {
+  path: string
+  title: string
+  children: DataFolderTreeNode[]
+}
+
+export interface DataStructureFolderOpResponse {
+  ok: boolean
+  layer: LayerName
+  path: string
+}
+
+export interface DataStructureFolderCreateRequest {
+  layer: LayerName
+  name: string
+}
+
+export interface DataStructureFolderRenameRequest {
+  layer: LayerName
+  path: string
+  new_name: string
+}

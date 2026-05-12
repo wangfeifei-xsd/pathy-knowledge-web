@@ -5,6 +5,7 @@ import { NaturalLanguageRecall } from '../pages/knowledgeRecall/NaturalLanguageR
 import { StopwordsConfig } from '../pages/knowledgeRecall/StopwordsConfig'
 import { Home } from '../pages/Home'
 import { Layers } from '../pages/Layers'
+import { StorageStructure } from '../pages/StorageStructure'
 import { CompileTask } from '../pages/llmTasks/CompileTask'
 import { LintReport } from '../pages/llmTasks/LintReport'
 import { PolishTextPage } from '../pages/llmTasks/PolishTextPage'
@@ -18,6 +19,7 @@ const router = createHashRouter([
     children: [
       { index: true, element: <Home /> },
       { path: 'layers', element: <Layers /> },
+      { path: 'storage/structure', element: <StorageStructure /> },
       { path: 'tasks', element: <Navigate to="/tasks/compile" replace /> },
       { path: 'tasks/compile', element: <CompileTask /> },
       { path: 'tasks/lint', element: <LintReport /> },

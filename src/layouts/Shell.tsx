@@ -2,8 +2,8 @@ import { App as AntApp, ConfigProvider, Layout, Menu, Space, theme as antdTheme,
 import zhCN from 'antd/locale/zh_CN'
 import {
   ApiOutlined,
+  DatabaseOutlined,
   FileSearchOutlined,
-  FolderOpenOutlined,
   HomeOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
@@ -17,6 +17,7 @@ export function Shell() {
   const loc = useLocation()
   const selected = useMemo(() => {
     if (loc.pathname.startsWith('/layers')) return ['/layers']
+    if (loc.pathname.startsWith('/storage/structure')) return ['/storage/structure']
     if (loc.pathname.startsWith('/knowledge-recall/nl')) return ['/knowledge-recall/nl']
     if (loc.pathname.startsWith('/knowledge-recall/dialogue-test')) return ['/knowledge-recall/dialogue-test']
     if (loc.pathname.startsWith('/knowledge-recall/stopwords')) return ['/knowledge-recall/stopwords']
@@ -45,10 +46,21 @@ export function Shell() {
             <Menu
               mode="inline"
               selectedKeys={selected}
-              defaultOpenKeys={['llm-tasks', 'knowledge-recall', 'model-settings']}
+              defaultOpenKeys={['storage', 'llm-tasks', 'knowledge-recall', 'model-settings']}
               items={[
                 { key: '/', icon: <HomeOutlined />, label: <Link to="/">概览</Link> },
-                { key: '/layers', icon: <FolderOpenOutlined />, label: <Link to="/layers">三层存储</Link> },
+                {
+                  key: 'storage',
+                  icon: <DatabaseOutlined />,
+                  label: '存储',
+                  children: [
+                    { key: '/layers', label: <Link to="/layers">三层存储</Link> },
+                    {
+                      key: '/storage/structure',
+                      label: <Link to="/storage/structure">存储结构</Link>,
+                    },
+                  ],
+                },
                 {
                   key: 'llm-tasks',
                   icon: <ApiOutlined />,

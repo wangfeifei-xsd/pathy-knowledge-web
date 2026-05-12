@@ -14,6 +14,7 @@ import {
   Space,
   Table,
   Tag,
+  TreeSelect,
   Typography,
   Upload,
 } from 'antd'
@@ -23,6 +24,7 @@ import type { Key } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, apiErrorDetail } from '../api/client'
 import type {
+  DataFolderTreeNode,
   DirEntry,
   FileContentResponse,
   LayerName,
@@ -35,8 +37,8 @@ type UploadCustomRequestOpt = Parameters<NonNullable<UploadProps['customRequest'
 
 const { Text } = Typography
 
-/** 左侧「浏览」列表表体固定高度（px），超出在表内滚动、表头保持可见 */
-const LAYERS_BROWSER_TABLE_SCROLL_Y = 520
+/** 文件列表表体固定高度（px），超出在表内滚动、表头保持可见 */
+const LAYERS_BROWSER_TABLE_SCROLL_Y = 600
 
 function entryApiPath(row: DirEntry): string {
   return row.path.replace(/\/$/, '')
@@ -105,6 +107,21 @@ function defaultSchemaRelativePath(prefixDir: string): string {
   return base ? `${base}/AGENTS.md` : 'AGENTS.md'
 }
 
+/** 将「目录树中的目录前缀」与上传文件名组合为层内相对路径（与 /upload 的 path 一致） */
+function joinUploadDirAndFileName(dirKey: string, fileName: string): string {
+  const d = dirKey.replace(/^\/+|\/+$/g, '')
+  return d ? `${d}/${fileName}` : fileName
+}
+
+function mapFolderNodeToTreeSelect(n: DataFolderTreeNode): { value: string; title: string; children?: ReturnType<typeof mapFolderNodeToTreeSelect>[] } {
+  const value = n.path.replace(/\/$/, '')
+  return {
+    value,
+    title: n.title,
+    children: n.children.length ? n.children.map(mapFolderNodeToTreeSelect) : undefined,
+  }
+}
+
 export function Layers() {
   const { message } = App.useApp()
   const [layer, setLayer] = useState<LayerName>('raw')
@@ -115,7 +132,8 @@ export function Layers() {
   const [content, setContent] = useState('')
   const [fileMeta, setFileMeta] = useState<FileContentResponse | null>(null)
   const [saving, setSaving] = useState(false)
-  const [uploadPath, setUploadPath] = useState('')
+  const [folderTree, setFolderTree] = useState<DataFolderTreeNode | null>(null)
+  const [folderTreeLoading, setFolderTreeLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const [batchDeleting, setBatchDeleting] = useState(false)
@@ -146,6 +164,35 @@ export function Layers() {
   useEffect(() => {
     void loadList()
   }, [loadList])
+
+  const browseDirKey = useMemo(() => prefix.replace(/\/$/, ''), [prefix])
+
+  const displayedEntries = useMemo(
+    () => (layer === 'schema' ? entries : entries.filter((e) => !e.is_dir)),
+    [entries, layer],
+  )
+
+  const loadFolderTree = useCallback(async () => {
+    if (layer === 'schema') {
+      setFolderTree(null)
+      return
+    }
+    setFolderTreeLoading(true)
+    try {
+      const { data } = await api.get<DataFolderTreeNode>(`/api/v1/data-structure/tree/${layer}`)
+      setFolderTree(data)
+    } catch (e) {
+      message.error('加载上传目录树失败')
+      console.error(e)
+      setFolderTree(null)
+    } finally {
+      setFolderTreeLoading(false)
+    }
+  }, [layer, message])
+
+  useEffect(() => {
+    void loadFolderTree()
+  }, [loadFolderTree])
 
   useEffect(() => {
     setSelectedRowKeys([])
@@ -184,6 +231,12 @@ export function Layers() {
     }
   }, [content, filePath, layer, loadList, message])
 
+  const closeFileEditor = useCallback(() => {
+    setFilePath(null)
+    setContent('')
+    setFileMeta(null)
+  }, [])
+
   const enterDir = useCallback(
     (e: DirEntry) => {
       if (!e.is_dir) {
@@ -192,11 +245,9 @@ export function Layers() {
         return
       }
       setPrefix(e.path)
-      setFilePath(null)
-      setContent('')
-      setFileMeta(null)
+      closeFileEditor()
     },
-    [openFile],
+    [closeFileEditor, openFile],
   )
 
   const deleteEntry = useCallback(
@@ -206,9 +257,7 @@ export function Layers() {
         await api.delete('/api/v1/layers/' + layer + '/file', { params: { path: p } })
         message.success('已删除')
         if (filePath === p) {
-          setFilePath(null)
-          setContent('')
-          setFileMeta(null)
+          closeFileEditor()
         }
         void loadList()
       } catch (e) {
@@ -216,7 +265,7 @@ export function Layers() {
         console.error(e)
       }
     },
-    [filePath, layer, loadList, message],
+    [closeFileEditor, filePath, layer, loadList, message],
   )
 
   const deleteSelectedEntries = useCallback(async () => {
@@ -231,9 +280,7 @@ export function Layers() {
           await api.delete('/api/v1/layers/' + layer + '/file', { params: { path: p } })
           ok++
           if (filePath === p) {
-            setFilePath(null)
-            setContent('')
-            setFileMeta(null)
+            closeFileEditor()
           }
         } catch {
           failed++
@@ -247,7 +294,7 @@ export function Layers() {
     } finally {
       setBatchDeleting(false)
     }
-  }, [filePath, layer, loadList, message, selectedRowKeys])
+  }, [closeFileEditor, filePath, layer, loadList, message, selectedRowKeys])
 
   const columns: ColumnsType<DirEntry> = useMemo(
     () => [
@@ -258,15 +305,9 @@ export function Layers() {
         render: (v: string, row) => {
           const label = `${v}${row.is_dir ? '/' : ''}`
           return (
-            <Button
-              type="link"
-              onClick={() => enterDir(row)}
-              style={{ padding: 0, height: 'auto', maxWidth: '100%' }}
-            >
-              <Text ellipsis={{ tooltip: label }} style={{ maxWidth: 90, display: 'inline-block' }}>
-                {label}
-              </Text>
-            </Button>
+            <Text ellipsis={{ tooltip: label }} style={{ maxWidth: 140, display: 'inline-block' }}>
+              {label}
+            </Text>
           )
         },
       },
@@ -293,10 +334,24 @@ export function Layers() {
       },
       {
         title: '操作',
-        width: 150,
+        width: 220,
         align: 'center',
         render: (_, row) => (
-          <Space size={6}>
+          <Space size={6} wrap>
+            {row.is_dir ? (
+              <Button type="link" size="small" style={{ padding: 0 }} onClick={() => enterDir(row)}>
+                进入
+              </Button>
+            ) : (
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0 }}
+                onClick={() => void openFile(row.path.replace(/\/$/, ''))}
+              >
+                详情
+              </Button>
+            )}
             {layer === 'wiki' && !row.is_dir ? (
               <Button
                 type="link"
@@ -337,7 +392,7 @@ export function Layers() {
         ),
       },
     ],
-    [deleteEntry, embeddingPath, enterDir, layer, loadList, message],
+    [deleteEntry, embeddingPath, enterDir, layer, loadList, message, openFile],
   )
 
   const openSchemaCreate = useCallback(() => {
@@ -388,18 +443,15 @@ export function Layers() {
     }
   }, [loadList, message, schemaDraft, schemaRelPath])
 
-  const suggestUploadPath = useCallback(
-    (fileName: string) => {
-      const base = prefix.replace(/\/$/, '')
-      return base ? `${base}/${fileName}` : fileName
-    },
-    [prefix],
-  )
+  const uploadTreeSelectData = useMemo(() => {
+    if (!folderTree) return []
+    return [mapFolderNodeToTreeSelect(folderTree)]
+  }, [folderTree])
 
   const handleUpload = useCallback(
     async (opt: UploadCustomRequestOpt) => {
       const raw = opt.file as File
-      const rel = uploadPath.trim() || suggestUploadPath(raw.name)
+      const rel = joinUploadDirAndFileName(browseDirKey, raw.name)
       setUploading(true)
       try {
         const text = await raw.text()
@@ -425,8 +477,8 @@ export function Layers() {
             ? `已上传 ${parts.length} 个文件（每 ${UPLOAD_CHUNK_CHARS} 字一段）：${uploadedPaths.join('、')}`
             : `已上传：${uploadedPaths[0]}`,
         )
-        setUploadPath('')
         void loadList()
+        void loadFolderTree()
       } catch (e) {
         opt.onError?.(e as Error)
         message.error(apiErrorDetail(e) ?? '上传失败')
@@ -435,12 +487,20 @@ export function Layers() {
         setUploading(false)
       }
     },
-    [layer, loadList, message, suggestUploadPath, uploadPath],
+    [browseDirKey, layer, loadFolderTree, loadList, message],
   )
 
   const crumbs = useMemo(() => {
     const parts = prefix.split('/').filter(Boolean)
-    const items: { title: string; onClick?: () => void }[] = [{ title: '根', onClick: () => setPrefix('') }]
+    const items: { title: string; onClick?: () => void }[] = [
+      {
+        title: '根',
+        onClick: () => {
+          setPrefix('')
+          closeFileEditor()
+        },
+      },
+    ]
     let acc = ''
     for (const p of parts) {
       acc = acc ? `${acc}/${p}` : p
@@ -449,12 +509,12 @@ export function Layers() {
         title: p,
         onClick: () => {
           setPrefix(at)
-          setFilePath(null)
+          closeFileEditor()
         },
       })
     }
     return items
-  }, [prefix])
+  }, [closeFileEditor, prefix])
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -465,11 +525,11 @@ export function Layers() {
         description={
           <ol style={{ margin: 0, paddingLeft: 20, marginBottom: 0 }}>
             <li>
-              <strong>raw 原始层</strong>：放入未编译的素材（纯文本）。在「浏览」卡片右上角使用 <strong>上传</strong>（默认保存到当前目录）；正文超过 <strong>2500 字（Unicode 字符）</strong>时会<strong>自动拆成多个文件</strong>（如{' '}
-              <code>笔记-1.md</code>、<code>笔记-2.md</code>）。也可点开 <code>*.md</code> 编辑保存。
+              <strong>raw / wiki 层</strong>：卡片标题栏<strong>左侧</strong>选层与目录，<strong>右侧</strong>为 <strong>查询 / 上传</strong>（与下方面包屑、列表前缀一致）。点 <strong>查询</strong> 拉取列表。列表<strong>仅显示文件</strong>，子目录请用树或面包屑进入。正文超过 <strong>2500 字（Unicode 字符）</strong>时会<strong>自动拆成多个文件</strong>（如{' '}
+              <code>笔记-1.md</code>、<code>笔记-2.md</code>）。在操作列点 <strong>详情</strong> 于<strong>弹窗</strong>中查看或编辑、保存；目录行点 <strong>进入</strong> 切换路径。
             </li>
             <li>
-              <strong>schema 规范层</strong>：切换到本层后点右上角 <strong>创建</strong>，在弹出框中编辑模板正文；可先 <strong>AI 润色</strong> 再保存到
+              <strong>schema 规范层</strong>：标题栏<strong>左侧</strong>切换层，<strong>右侧</strong> <strong>查询 / 创建</strong>；点创建在弹出框中编辑模板正文；可先 <strong>AI 润色</strong> 再保存到
               <code>schema/</code>。编译 / Lint 时会读入这些约定。
             </li>
             <li>
@@ -483,9 +543,56 @@ export function Layers() {
         }
       />
     <Row gutter={16} align="stretch">
-      <Col xs={24} lg={10} style={{ display: 'flex', minWidth: 0 }}>
+      <Col xs={24} lg={24} style={{ display: 'flex', minWidth: 0 }}>
         <Card
-          title="浏览"
+          title={
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'nowrap',
+                minWidth: 0,
+              }}
+            >
+              <Select<LayerName>
+                value={layer}
+                size="middle"
+                style={{ width: 130, flexShrink: 0 }}
+                onChange={(v) => {
+                  if (v !== 'schema') setSchemaModalOpen(false)
+                  setLayer(v)
+                  setPrefix('')
+                  closeFileEditor()
+                }}
+                options={[
+                  { value: 'raw', label: 'raw 原始层' },
+                  { value: 'wiki', label: 'wiki 编译层' },
+                  { value: 'schema', label: 'schema 规范层' },
+                ]}
+              />
+              {layer !== 'schema' ? (
+                <TreeSelect
+                  size="middle"
+                  style={{ width: 220, minWidth: 140, flexShrink: 1, maxWidth: '100%' }}
+                  placeholder="目录（查询/上传）"
+                  allowClear
+                  showSearch
+                  treeDefaultExpandAll
+                  loading={folderTreeLoading}
+                  disabled={uploading}
+                  value={browseDirKey}
+                  onChange={(v) => {
+                    const key = typeof v === 'string' ? v : ''
+                    setPrefix(key ? `${key}/` : '')
+                    closeFileEditor()
+                  }}
+                  treeData={uploadTreeSelectData}
+                  treeNodeFilterProp="title"
+                />
+              ) : null}
+            </div>
+          }
           style={{ flex: 1, width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
           styles={{
             header: {
@@ -502,63 +609,39 @@ export function Layers() {
             },
           }}
           extra={
-            <Space
-              wrap
-              size={12}
-              align="center"
-              style={{ rowGap: 10, paddingBlock: 2 }}
-            >
-              <Select<LayerName>
-                value={layer}
-                size="middle"
-                style={{ width: 130 }}
-                onChange={(v) => {
-                  if (v !== 'schema') setSchemaModalOpen(false)
-                  setLayer(v)
-                  setPrefix('')
-                  setFilePath(null)
-                }}
-                options={[
-                  { value: 'raw', label: 'raw 原始层' },
-                  { value: 'wiki', label: 'wiki 编译层' },
-                  { value: 'schema', label: 'schema 规范层' },
-                ]}
-              />
-              <Button size="middle" onClick={() => void loadList()}>
-                刷新
-              </Button>
-              {layer === 'schema' ? (
+            layer === 'schema' ? (
+              <Space size={10}>
+                <Button type="primary" size="middle" onClick={() => { void loadList(); void loadFolderTree() }}>
+                  查询
+                </Button>
                 <Button type="primary" icon={<FileAddOutlined />} size="middle" onClick={openSchemaCreate}>
                   创建
                 </Button>
-              ) : (
-                <>
-                  <Input
-                    size="middle"
-                    style={{ width: 208 }}
-                    placeholder="上传路径（可选）"
-                    value={uploadPath}
-                    onChange={(e) => setUploadPath(e.target.value)}
-                    allowClear
-                  />
-                  <Upload
-                    maxCount={1}
-                    showUploadList={false}
-                    customRequest={(opt) => void handleUpload(opt)}
-                    disabled={uploading}
-                  >
-                    <Button
-                      type="primary"
-                      icon={<UploadOutlined />}
-                      loading={uploading}
-                      size="middle"
-                    >
-                      上传
-                    </Button>
-                  </Upload>
-                </>
-              )}
-            </Space>
+              </Space>
+            ) : (
+              <Space size={10}>
+                <Button
+                  type="primary"
+                  size="middle"
+                  onClick={() => {
+                    void loadList()
+                    void loadFolderTree()
+                  }}
+                >
+                  查询
+                </Button>
+                <Upload
+                  maxCount={1}
+                  showUploadList={false}
+                  customRequest={(opt) => void handleUpload(opt)}
+                  disabled={uploading}
+                >
+                  <Button type="primary" icon={<UploadOutlined />} loading={uploading} size="middle">
+                    上传
+                  </Button>
+                </Upload>
+              </Space>
+            )
           }
         >
           <Breadcrumb
@@ -601,9 +684,9 @@ export function Layers() {
               rowKey={(r) => r.path}
               loading={listLoading}
               columns={columns}
-              dataSource={entries}
+              dataSource={displayedEntries}
               pagination={false}
-              scroll={{ x: 760, y: LAYERS_BROWSER_TABLE_SCROLL_Y }}
+              scroll={{ x: 820, y: LAYERS_BROWSER_TABLE_SCROLL_Y }}
               rowSelection={{
                 selectedRowKeys,
                 onChange: setSelectedRowKeys,
@@ -613,46 +696,40 @@ export function Layers() {
           </div>
         </Card>
       </Col>
-      <Col xs={24} lg={14} style={{ display: 'flex', minWidth: 0 }}>
-        <Card
-          title={filePath ? `编辑：${filePath}` : '未选择文件'}
-          style={{ flex: 1, width: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
-          styles={{
-            body: {
-              flex: 1,
-              minHeight: 0,
-              display: 'flex',
-              flexDirection: 'column',
-            },
-          }}
-          extra={
+    </Row>
+      <Modal
+        title={filePath ? `编辑：${filePath}` : '编辑'}
+        open={filePath != null}
+        onCancel={closeFileEditor}
+        width={920}
+        centered
+        maskClosable={false}
+        footer={
+          <Space>
+            <Button onClick={closeFileEditor}>关闭</Button>
             <Button type="primary" disabled={!filePath} loading={saving} onClick={() => void saveFile()}>
               保存
             </Button>
-          }
-        >
-          {fileMeta && (
-            <Text type="secondary" style={{ display: 'block', marginBottom: 8, flexShrink: 0 }}>
-              UTF-8 · {fileMeta.size} 字节
-            </Text>
-          )}
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <Input.TextArea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="选择左侧文件进行查看或编辑"
-              style={{
-                flex: 1,
-                minHeight: 280,
-                width: '100%',
-                resize: 'none',
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              }}
-            />
-          </div>
-        </Card>
-      </Col>
-    </Row>
+          </Space>
+        }
+      >
+        {fileMeta ? (
+          <Text type="secondary" style={{ display: 'block', marginBottom: 10 }}>
+            UTF-8 · {fileMeta.size} 字节
+          </Text>
+        ) : null}
+        <Input.TextArea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="在列表操作列点击「详情」打开此弹窗进行编辑"
+          style={{
+            minHeight: 420,
+            width: '100%',
+            resize: 'vertical',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          }}
+        />
+      </Modal>
       <Modal
         title="创建规范文件（schema）"
         open={schemaModalOpen}

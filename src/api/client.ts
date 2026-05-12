@@ -16,10 +16,8 @@ export function apiErrorDetail(err: unknown): string | undefined {
 const BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? '').trim()
 const TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT ?? 120_000) || 120_000
 
+/** 不设默认 Content-Type：避免 FormData 上传被 axios 按 JSON 序列化（multipart 会 422）。 */
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: TIMEOUT,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
