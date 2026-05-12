@@ -18,6 +18,14 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 
 本地开发时请先按该文档启动 API 服务，再在本目录执行 `npm install` 与 `npm run dev`。
 
+### 应用根路径（`base`：默认 `/wiki/`）
+
+与 **agent-plant-ui** 中 `base: '/agentplatform/'` 类似（静态资源挂在子路径），本前端默认 **`VITE_BASE=/wiki/`**（见 `vite.config.ts`）：构建产物在 **`wiki/`** 目录，部署到网关的 **`/wiki/`** 子路径后，访问形态为 **`https://<host>/wiki/#/`**、`#/layers` 等。
+
+- **本地开发**：默认请打开 **`http://127.0.0.1:5173/wiki/`**（注意带 **`/wiki/`**）。
+- **想挂在站点根路径**（`http://127.0.0.1:5173/`）：启动前设置环境变量 **`VITE_BASE=/`**（或空字符串会回退为默认 `/wiki/`，若需根路径请显式设为 `/`）。
+- **构建输出目录**：默认 **`wiki/`**，可通过 **`VITE_OUT_DIR`** 覆盖（例如 `dist`）。
+
 ## 页面与路由
 
 | 路由 | 说明 |
@@ -43,4 +51,4 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 powershell -ExecutionPolicy Bypass -File .\start-web.ps1 -Port 5174 -ApiTarget "http://127.0.0.1:8766"
 ```
 
-启动后浏览器访问前端地址：`http://127.0.0.1:5174`。
+启动后浏览器访问前端地址（默认带 `/wiki/` 子路径）：`http://127.0.0.1:5174/wiki/`；若启动时指定了 `-Base /` 则为根路径 `http://127.0.0.1:5174/`。
