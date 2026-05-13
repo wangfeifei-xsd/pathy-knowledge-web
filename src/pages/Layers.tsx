@@ -455,9 +455,12 @@ export function Layers() {
       setUploading(true)
       try {
         const text = await raw.text()
-        const charCount = [...text].length
         const parts =
-          charCount <= UPLOAD_CHUNK_CHARS ? [text] : splitTextByMaxChars(text, UPLOAD_CHUNK_CHARS)
+          layer === 'wiki'
+            ? [text]
+            : [...text].length <= UPLOAD_CHUNK_CHARS
+              ? [text]
+              : splitTextByMaxChars(text, UPLOAD_CHUNK_CHARS)
         const paths = expandUploadPaths(rel, parts.length)
         let lastData: FileContentResponse | null = null
         const uploadedPaths: string[] = []
@@ -474,7 +477,7 @@ export function Layers() {
         opt.onSuccess?.(lastData!, new XMLHttpRequest())
         message.success(
           parts.length > 1
-            ? `已上传 ${parts.length} 个文件（每 ${UPLOAD_CHUNK_CHARS} 字一段）：${uploadedPaths.join('、')}`
+            ? `已上传 ${parts.length} 个文件（raw 层每 ${UPLOAD_CHUNK_CHARS} 字一段）：${uploadedPaths.join('、')}`
             : `已上传：${uploadedPaths[0]}`,
         )
         void loadList()
@@ -525,8 +528,8 @@ export function Layers() {
         description={
           <ol style={{ margin: 0, paddingLeft: 20, marginBottom: 0 }}>
             <li>
-              <strong>raw / wiki 层</strong>：卡片标题栏<strong>左侧</strong>选层与目录，<strong>右侧</strong>为 <strong>查询 / 上传</strong>（与下方面包屑、列表前缀一致）。点 <strong>查询</strong> 拉取列表。列表<strong>仅显示文件</strong>，子目录请用树或面包屑进入。正文超过 <strong>2500 字（Unicode 字符）</strong>时会<strong>自动拆成多个文件</strong>（如{' '}
-              <code>笔记-1.md</code>、<code>笔记-2.md</code>）。在操作列点 <strong>详情</strong> 于<strong>弹窗</strong>中查看或编辑、保存；目录行点 <strong>进入</strong> 切换路径。
+              <strong>raw / wiki 层</strong>：卡片标题栏<strong>左侧</strong>选层与目录，<strong>右侧</strong>为 <strong>查询 / 上传</strong>（与下方面包屑、列表前缀一致）。点 <strong>查询</strong> 拉取列表。列表<strong>仅显示文件</strong>，子目录请用树或面包屑进入。<strong>raw 层</strong>上传时正文超过 <strong>2500 字（Unicode 字符）</strong>会<strong>自动拆成多个文件</strong>（如{' '}
+              <code>笔记-1.md</code>、<code>笔记-2.md</code>）；<strong>wiki 层</strong>上传<strong>不切片</strong>，整篇写入所选路径下的单个文件（仍受服务端单文件大小上限约束）。在操作列点 <strong>详情</strong> 于<strong>弹窗</strong>中查看或编辑、保存；目录行点 <strong>进入</strong> 切换路径。
             </li>
             <li>
               <strong>schema 规范层</strong>：标题栏<strong>左侧</strong>切换层，<strong>右侧</strong> <strong>查询 / 创建</strong>；点创建在弹出框中编辑模板正文；可先 <strong>AI 润色</strong> 再保存到
