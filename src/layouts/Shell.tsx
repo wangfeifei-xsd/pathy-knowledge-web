@@ -17,6 +17,7 @@ export function Shell() {
   const loc = useLocation()
   const selected = useMemo(() => {
     if (loc.pathname.startsWith('/layers')) return ['/layers']
+    if (loc.pathname.startsWith('/storage/media')) return ['/storage/media']
     if (loc.pathname.startsWith('/storage/structure')) return ['/storage/structure']
     if (loc.pathname.startsWith('/knowledge-recall/nl')) return ['/knowledge-recall/nl']
     if (loc.pathname.startsWith('/knowledge-recall/dialogue-test')) return ['/knowledge-recall/dialogue-test']
@@ -73,6 +74,10 @@ export function Shell() {
                         {
                           key: '/storage/structure',
                           label: <Link to="/storage/structure">存储结构</Link>,
+                        },
+                        {
+                          key: '/storage/media',
+                          label: <Link to="/storage/media">多媒体存储</Link>,
                         },
                       ],
                     },

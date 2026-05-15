@@ -1,7 +1,8 @@
 import { App, Alert, Button, Card, Collapse, Form, Input, InputNumber, Space, Table, Typography } from 'antd'
 import { useState } from 'react'
 import { api, apiErrorDetail } from '../../api/client'
-import type { DialogueRecallTestResponse } from '../../api/types'
+import type { DialogueRecallHit, DialogueRecallTestResponse } from '../../api/types'
+import { InjectedContextMediaPanel } from './InjectedContextMediaPanel'
 import { RecallLaneSummary } from './recallLaneUi'
 
 const { Paragraph } = Typography
@@ -57,8 +58,11 @@ export function DialogueSummonTest() {
           message="流水线说明"
           description={
             <span>
-              在 <strong>wiki</strong> 编译层执行 <strong>BM25 + 向量</strong> 双路召回（各自 topN），合并去重后轻量
-              rerank，取 topK 片段注入 Chat Completions，再返回模型回答。
+              在 <strong>wiki</strong> 编译层执行 <strong>BM25 + 向量</strong> 双路召回（各自 topN），合并去重后轻量 rerank，将纯文本片段拼接为{' '}
+              <Typography.Text code>injected_context</Typography.Text>。服务端把「待答问题」与该正文一并写入发给 Chat Completions 的{' '}
+              <strong>user</strong> 消息（<Typography.Text code>injected_context</Typography.Text> 内不含 wiki 媒体占位与媒体
+              code）。片段关联的媒体在 <Typography.Text code>merged_media</Typography.Text>，由下方接口拉取登记信息并以 GET
+              二进制做内联预览。
             </span>
           }
         />
@@ -138,7 +142,7 @@ export function DialogueSummonTest() {
             <Paragraph strong style={{ marginTop: 8 }}>
               召回命中
             </Paragraph>
-            <Table
+            <Table<DialogueRecallHit>
               size="small"
               pagination={false}
               rowKey={(_, i) => String(i)}
@@ -154,13 +158,14 @@ export function DialogueSummonTest() {
               items={[
                 {
                   key: 'ctx',
-                  label: '注入 LLM 的参考资料（实际发送片段）',
+                  label: 'injected_context（已拼入模型 user 消息的纯文本参考资料）',
                   children: (
                     <Input.TextArea value={recallRes.injected_context} readOnly rows={10} />
                   ),
                 },
               ]}
             />
+            <InjectedContextMediaPanel recall={recallRes} />
             <Paragraph strong style={{ marginTop: 16 }}>
               模型回答
             </Paragraph>

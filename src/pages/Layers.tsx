@@ -5,6 +5,7 @@ import {
   Breadcrumb,
   Button,
   Card,
+  Checkbox,
   Col,
   Input,
   Modal,
@@ -21,14 +22,19 @@ import {
 import type { UploadProps } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Key } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api, apiErrorDetail } from '../api/client'
+import { mediaBinaryUrl } from '../api/mediaUrls'
 import type {
   DataFolderTreeNode,
+  DialogueRecallHit,
+  DialogueRecallRequest,
+  DialogueRecallResponse,
   DirEntry,
   FileContentResponse,
   LayerName,
   ListLayerResponse,
+  MediaRef,
   PolishTextResponse,
   WikiEmbedResponse,
 } from '../api/types'
@@ -113,6 +119,32 @@ function joinUploadDirAndFileName(dirKey: string, fileName: string): string {
   return d ? `${d}/${fileName}` : fileName
 }
 
+/** 根据召回标题路径（「父 > 子」）在正文里找 ATX 标题行下标；从最深标题向前尝试 */
+function findHeadingLineIndex(content: string, headingPath: string): number {
+  const parts = headingPath
+    .split(/\s*>\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const lines = content.replace(/\r\n/g, '\n').split('\n')
+  for (let pi = parts.length - 1; pi >= 0; pi--) {
+    const title = parts[pi]
+    const esc = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`^#{1,6}\\s+${esc}\\s*$`)
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) return i
+    }
+  }
+  return -1
+}
+
+function lineCharRange(content: string, lineIndex: number): { start: number; end: number } {
+  const lines = content.replace(/\r\n/g, '\n').split('\n')
+  let start = 0
+  for (let i = 0; i < lineIndex; i++) start += lines[i].length + 1
+  const line = lines[lineIndex] ?? ''
+  return { start, end: start + line.length }
+}
+
 function mapFolderNodeToTreeSelect(n: DataFolderTreeNode): { value: string; title: string; children?: ReturnType<typeof mapFolderNodeToTreeSelect>[] } {
   const value = n.path.replace(/\/$/, '')
   return {
@@ -145,6 +177,17 @@ export function Layers() {
   const [polishHint, setPolishHint] = useState('')
   const [polishing, setPolishing] = useState(false)
   const [savingSchema, setSavingSchema] = useState(false)
+
+  /** wiki 层：用语义/关键词召回定位到文件，便于插入 ![[MEDIA:…]] */
+  const [wikiLocateQuery, setWikiLocateQuery] = useState('')
+  const [wikiLocateOnlyCurrentDir, setWikiLocateOnlyCurrentDir] = useState(true)
+  const [wikiLocateLoading, setWikiLocateLoading] = useState(false)
+  const [wikiLocateHits, setWikiLocateHits] = useState<DialogueRecallHit[] | null>(null)
+  const [wikiLocateMergedMedia, setWikiLocateMergedMedia] = useState<MediaRef[]>([])
+
+  /** 从「按片段定位」打开文件后，根据 heading_path 选中标题行；文案提示 */
+  const pendingRecallHeadingRef = useRef<string | null>(null)
+  const [recallHeadingBanner, setRecallHeadingBanner] = useState<string | null>(null)
 
   const loadList = useCallback(async () => {
     setListLoading(true)
@@ -198,8 +241,18 @@ export function Layers() {
     setSelectedRowKeys([])
   }, [layer, prefix])
 
+  useEffect(() => {
+    if (layer !== 'wiki') {
+      setWikiLocateHits(null)
+      setWikiLocateMergedMedia([])
+      setWikiLocateQuery('')
+    }
+  }, [layer])
+
   const openFile = useCallback(
-    async (path: string) => {
+    async (path: string, opts?: { recallHeadingPath?: string | null }) => {
+      pendingRecallHeadingRef.current = (opts?.recallHeadingPath ?? '').trim() || null
+      setRecallHeadingBanner(null)
       try {
         const { data } = await api.get<FileContentResponse>('/api/v1/layers/' + layer + '/file', {
           params: { path },
@@ -208,12 +261,58 @@ export function Layers() {
         setContent(data.content)
         setFileMeta(data)
       } catch (e) {
+        pendingRecallHeadingRef.current = null
         message.error('读取文件失败')
         console.error(e)
       }
     },
     [layer, message],
   )
+
+  useLayoutEffect(() => {
+    const hp = pendingRecallHeadingRef.current
+    if (!filePath || !content || !hp) return
+
+    let cancelled = false
+    let attempts = 0
+    const tryApply = () => {
+      if (cancelled) return
+      const ta = document.getElementById('layers-wiki-editor-ta') as HTMLTextAreaElement | null
+      if (!ta) {
+        attempts += 1
+        if (attempts < 24) {
+          requestAnimationFrame(tryApply)
+        } else {
+          pendingRecallHeadingRef.current = null
+          setRecallHeadingBanner(`无法在编辑器中找到文本框，请手动搜索标题：${hp}`)
+        }
+        return
+      }
+      const lineIdx = findHeadingLineIndex(content, hp)
+      pendingRecallHeadingRef.current = null
+      if (lineIdx < 0) {
+        setRecallHeadingBanner(`未在正文找到与「${hp}」匹配的 ATX 标题行（# …），请手动定位后粘贴媒体标签。`)
+        return
+      }
+      const { start, end } = lineCharRange(content, lineIdx)
+      const lineText = content.replace(/\r\n/g, '\n').split('\n')[lineIdx] ?? ''
+      const plain = lineText.replace(/^#{1,6}\s+/, '').trim().slice(0, 100)
+      setRecallHeadingBanner(
+        `已选中召回片段所在标题行（便于在附近插入 ` + '`![[MEDIA:…]]`' + `）：${plain || lineText}`,
+      )
+      requestAnimationFrame(() => {
+        if (cancelled) return
+        ta.focus()
+        ta.setSelectionRange(start, end)
+        const lh = parseFloat(getComputedStyle(ta).lineHeight) || 22
+        ta.scrollTop = Math.max(0, lineIdx * lh - ta.clientHeight / 2 + lh)
+      })
+    }
+    requestAnimationFrame(tryApply)
+    return () => {
+      cancelled = true
+    }
+  }, [content, filePath])
 
   const saveFile = useCallback(async () => {
     if (!filePath) return
@@ -232,10 +331,57 @@ export function Layers() {
   }, [content, filePath, layer, loadList, message])
 
   const closeFileEditor = useCallback(() => {
+    pendingRecallHeadingRef.current = null
+    setRecallHeadingBanner(null)
     setFilePath(null)
     setContent('')
     setFileMeta(null)
   }, [])
+
+  const jumpToWikiHit = useCallback(
+    (hit: DialogueRecallHit) => {
+      const rel = hit.path
+      const slash = rel.lastIndexOf('/')
+      const dirPrefix = slash >= 0 ? rel.slice(0, slash + 1) : ''
+      setPrefix(dirPrefix)
+      void openFile(rel, { recallHeadingPath: hit.heading_path ?? '' })
+    },
+    [openFile],
+  )
+
+  const runWikiLocate = useCallback(async () => {
+    const q = wikiLocateQuery.trim()
+    if (!q) {
+      message.warning('请输入检索词')
+      return
+    }
+    setWikiLocateLoading(true)
+    try {
+      const wiki_prefix =
+        wikiLocateOnlyCurrentDir && browseDirKey ? browseDirKey : undefined
+      const payload: DialogueRecallRequest = {
+        query: q,
+        wiki_prefix: wiki_prefix || undefined,
+        max_files: 120,
+        bm25_top_n: 20,
+        vector_top_n: 20,
+        top_k_chunks: 16,
+        chunk_max_chars: 1200,
+        context_budget_chars: 32000,
+      }
+      const { data } = await api.post<DialogueRecallResponse>('/api/v1/dialogue/recall', payload)
+      setWikiLocateHits(data.recall_hits)
+      setWikiLocateMergedMedia(data.merged_media ?? [])
+      message.success(`命中 ${data.recall_hits.length} 条片段`)
+    } catch (e) {
+      message.error(apiErrorDetail(e) ?? '定位搜索失败')
+      console.error(e)
+      setWikiLocateHits(null)
+      setWikiLocateMergedMedia([])
+    } finally {
+      setWikiLocateLoading(false)
+    }
+  }, [browseDirKey, message, wikiLocateOnlyCurrentDir, wikiLocateQuery])
 
   const enterDir = useCallback(
     (e: DirEntry) => {
@@ -395,6 +541,33 @@ export function Layers() {
     [deleteEntry, embeddingPath, enterDir, layer, loadList, message, openFile],
   )
 
+  const wikiLocateColumns: ColumnsType<DialogueRecallHit> = useMemo(
+    () => [
+      { title: '文件路径', dataIndex: 'path', key: 'path', ellipsis: true, width: 180 },
+      {
+        title: '标题路径',
+        dataIndex: 'heading_path',
+        key: 'heading_path',
+        width: 160,
+        ellipsis: true,
+        render: (v: string | undefined) => (v && v.trim() ? <Text code>{v}</Text> : <Text type="secondary">（无）</Text>),
+      },
+      { title: '得分', dataIndex: 'score', key: 'score', width: 72 },
+      { title: '片段预览', dataIndex: 'snippet', key: 'snippet', ellipsis: true },
+      {
+        title: '操作',
+        key: 'open',
+        width: 100,
+        render: (_, row) => (
+          <Button type="link" size="small" onClick={() => jumpToWikiHit(row)}>
+            打开编辑
+          </Button>
+        ),
+      },
+    ],
+    [jumpToWikiHit],
+  )
+
   const openSchemaCreate = useCallback(() => {
     setSchemaRelPath(defaultSchemaRelativePath(prefix))
     setSchemaDraft(SCHEMA_CREATE_TEMPLATE)
@@ -529,7 +702,7 @@ export function Layers() {
           <ol style={{ margin: 0, paddingLeft: 20, marginBottom: 0 }}>
             <li>
               <strong>raw / wiki 层</strong>：卡片标题栏<strong>左侧</strong>选层与目录，<strong>右侧</strong>为 <strong>查询 / 上传</strong>（与下方面包屑、列表前缀一致）。点 <strong>查询</strong> 拉取列表。列表<strong>仅显示文件</strong>，子目录请用树或面包屑进入。<strong>raw 层</strong>上传时正文超过 <strong>2500 字（Unicode 字符）</strong>会<strong>自动拆成多个文件</strong>（如{' '}
-              <code>笔记-1.md</code>、<code>笔记-2.md</code>）；<strong>wiki 层</strong>上传<strong>不切片</strong>，整篇写入所选路径下的单个文件（仍受服务端单文件大小上限约束）。在操作列点 <strong>详情</strong> 于<strong>弹窗</strong>中查看或编辑、保存；目录行点 <strong>进入</strong> 切换路径。
+              <code>笔记-1.md</code>、<code>笔记-2.md</code>）；<strong>wiki 层</strong>上传<strong>不切片</strong>，整篇写入所选路径下的单个文件（仍受服务端单文件大小上限约束）。在操作列点 <strong>详情</strong> 于<strong>弹窗</strong>中查看或编辑、保存；目录行点 <strong>进入</strong> 切换路径。<strong>wiki 层</strong>还可使用下方 <strong>「按片段定位到文件」</strong>：输入关键词或自然语言，调用与「召回知识」相同的双路召回，命中后点 <strong>打开编辑</strong> 直达对应 Markdown，便于插入 <code>![[MEDIA:…]]</code>。
             </li>
             <li>
               <strong>schema 规范层</strong>：标题栏<strong>左侧</strong>切换层，<strong>右侧</strong> <strong>查询 / 创建</strong>；点创建在弹出框中编辑模板正文；可先 <strong>AI 润色</strong> 再保存到
@@ -662,6 +835,78 @@ export function Layers() {
             }))}
             style={{ marginBottom: 12, flexShrink: 0 }}
           />
+          {layer === 'wiki' && (
+            <Card
+              type="inner"
+              size="small"
+              title="按片段定位到文件（BM25 + 向量，与「召回知识」同源）"
+              style={{ marginBottom: 12, flexShrink: 0 }}
+            >
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  用语义或关键词检索 wiki 切片，命中后点「打开编辑」直接打开对应 Markdown，便于插入{' '}
+                  <Text code>![[MEDIA:…]]</Text>；片段预览中含标题路径（若有）。
+                </Text>
+                <Space.Compact style={{ width: '100%', maxWidth: 640 }}>
+                  <Input
+                    placeholder="例如：白点病药浴、疾病大全 第二章…"
+                    value={wikiLocateQuery}
+                    onChange={(e) => setWikiLocateQuery(e.target.value)}
+                    onPressEnter={() => void runWikiLocate()}
+                    allowClear
+                  />
+                  <Button type="primary" loading={wikiLocateLoading} onClick={() => void runWikiLocate()}>
+                    搜索定位
+                  </Button>
+                </Space.Compact>
+                <Checkbox
+                  checked={wikiLocateOnlyCurrentDir}
+                  onChange={(e) => setWikiLocateOnlyCurrentDir(e.target.checked)}
+                >
+                  仅扫描当前面包屑目录
+                  {browseDirKey ? (
+                    <Text type="secondary">
+                      （<Text code>{browseDirKey}/</Text>）
+                    </Text>
+                  ) : (
+                    <Text type="secondary">（当前在 wiki 根，即整库）</Text>
+                  )}
+                </Checkbox>
+                {!wikiLocateOnlyCurrentDir ? (
+                  <Text type="warning" style={{ fontSize: 12 }}>
+                    未勾选时将扫描整个 wiki（受 max_files 上限），大库可能略慢。
+                  </Text>
+                ) : null}
+                {wikiLocateHits != null && wikiLocateMergedMedia.length > 0 ? (
+                  <div style={{ marginBottom: 8 }}>
+                    <Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}>
+                      本次命中中的媒体（合并去重）：
+                    </Text>
+                    <Space size={[4, 4]} wrap>
+                      {wikiLocateMergedMedia.map((x) => (
+                        <Tag key={x.code}>
+                          <a href={mediaBinaryUrl(x.code)} target="_blank" rel="noreferrer">
+                            {x.code.slice(0, 8)}…
+                          </a>
+                        </Tag>
+                      ))}
+                    </Space>
+                  </div>
+                ) : null}
+                {wikiLocateHits != null && (
+                  <Table<DialogueRecallHit>
+                    size="small"
+                    rowKey={(row, i) => `${i}-${row.path}-${row.score}`}
+                    columns={wikiLocateColumns}
+                    dataSource={wikiLocateHits}
+                    pagination={false}
+                    locale={{ emptyText: '无命中，可换关键词或取消「仅当前目录」' }}
+                    scroll={{ y: 220, x: 900 }}
+                  />
+                )}
+              </Space>
+            </Card>
+          )}
           {selectedRowKeys.length > 0 && (
             <Space wrap style={{ marginBottom: 12, flexShrink: 0 }}>
               <Popconfirm
@@ -721,7 +966,19 @@ export function Layers() {
             UTF-8 · {fileMeta.size} 字节
           </Text>
         ) : null}
+        {recallHeadingBanner ? (
+          <Alert
+            type="info"
+            showIcon
+            closable
+            onClose={() => setRecallHeadingBanner(null)}
+            message="召回定位"
+            description={recallHeadingBanner}
+            style={{ marginBottom: 10 }}
+          />
+        ) : null}
         <Input.TextArea
+          id="layers-wiki-editor-ta"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="在列表操作列点击「详情」打开此弹窗进行编辑"

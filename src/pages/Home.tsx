@@ -88,6 +88,9 @@ export function Home() {
           <RouterLink to="/layers">
             <Button type="default">三层存储</Button>
           </RouterLink>
+          <RouterLink to="/storage/media">
+            <Button type="default">多媒体存储</Button>
+          </RouterLink>
           <RouterLink to="/tasks/compile">
             <Button type="default">编译任务</Button>
           </RouterLink>

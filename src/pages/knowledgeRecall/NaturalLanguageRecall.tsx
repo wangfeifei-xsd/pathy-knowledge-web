@@ -1,7 +1,8 @@
 import { App, Alert, Button, Card, Collapse, Form, Input, InputNumber, Space, Table, Typography } from 'antd'
 import { useState } from 'react'
 import { api, apiErrorDetail } from '../../api/client'
-import type { DialogueRecallRequest, DialogueRecallResponse } from '../../api/types'
+import type { DialogueRecallHit, DialogueRecallRequest, DialogueRecallResponse } from '../../api/types'
+import { InjectedContextMediaPanel } from './InjectedContextMediaPanel'
 import { RecallLaneSummary } from './recallLaneUi'
 
 const { Paragraph } = Typography
@@ -58,8 +59,9 @@ export function NaturalLanguageRecall() {
           description={
             <span>
               在 <strong>wiki</strong> 编译层执行 <strong>BM25 + 向量</strong> 双路召回（各自 topN），合并去重后做轻量
-              rerank，再取 topK 按预算拼接为「参考资料」正文；<strong>不调用 LLM</strong>。接口路径：
-              <code>/api/v1/dialogue/recall</code>。
+              rerank，再取 topK 按预算拼接为纯文本 <Typography.Text code>injected_context</Typography.Text>（本页<strong>不调用
+              LLM</strong>，仅供核对）。接口路径：<code>/api/v1/dialogue/recall</code>。关联媒体在{' '}
+              <Typography.Text code>merged_media</Typography.Text>，见下方登记校验与预览。
             </span>
           }
         />
@@ -130,7 +132,7 @@ export function NaturalLanguageRecall() {
             <Paragraph strong style={{ marginTop: 8 }}>
               召回命中
             </Paragraph>
-            <Table
+            <Table<DialogueRecallHit>
               size="small"
               pagination={false}
               rowKey={(_, i) => String(i)}
@@ -146,11 +148,12 @@ export function NaturalLanguageRecall() {
               items={[
                 {
                   key: 'ctx',
-                  label: '拼接后的参考资料（与全流程注入块一致）',
+                  label: 'injected_context（拼接后的纯文本参考资料）',
                   children: <Input.TextArea value={res.injected_context} readOnly rows={10} />,
                 },
               ]}
             />
+            <InjectedContextMediaPanel recall={res} />
             <Paragraph type="secondary" style={{ marginTop: 8 }}>
               {res.message}
             </Paragraph>

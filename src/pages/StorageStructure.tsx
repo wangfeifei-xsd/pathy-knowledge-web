@@ -15,6 +15,7 @@ const LAYER_TAB: { key: LayerName; label: string }[] = [
   { key: 'raw', label: 'raw' },
   { key: 'wiki', label: 'wiki' },
   { key: 'schema', label: 'schema' },
+  { key: 'media', label: 'media' },
 ]
 
 const ROOT_TREE_KEY = '__root__'
@@ -137,7 +138,7 @@ export function StorageStructure() {
       message.success('已删除')
       void loadTree()
     } catch (e) {
-      message.error(apiErrorDetail(e) ?? '删除失败（仅空目录可删；wiki 若开启禁止删除则受限）')
+      message.error(apiErrorDetail(e) ?? '删除失败（仅空目录可删；wiki 若开启禁止删除则受限；media 勿删 objects 与 manifest）')
       console.error(e)
     }
   }, [loadTree, message, selectedPath, tab])
@@ -164,9 +165,12 @@ export function StorageStructure() {
         message="存储结构"
         description={
           <Paragraph style={{ marginBottom: 0 }}>
-            与服务器 <Text code>data/</Text> 下 <Text code>raw</Text>、<Text code>wiki</Text>、<Text code>schema</Text>{' '}
-            目录对应。<strong>新增</strong>仅允许在<strong>各层根下再挂一层</strong>子目录（例如 <Text code>raw/reef</Text>、
-            <Text code>wiki/reef</Text>）。<strong>重命名</strong>与<strong>删除</strong>仅当该目录<strong>为空</strong>（无文件、无子目录）时允许。
+            与服务器 <Text code>data/</Text> 下 <Text code>raw</Text>、<Text code>wiki</Text>、<Text code>schema</Text>、
+            <Text code>media</Text> 目录对应。<strong>新增</strong>仅允许在<strong>各层根下再挂一层</strong>子目录（例如{' '}
+            <Text code>raw/reef</Text>、<Text code>wiki/reef</Text>、<Text code>media/albums</Text>）。<strong>重命名</strong>与
+            <strong>删除</strong>仅当该目录<strong>为空</strong>（无文件、无子目录）时允许。
+            <Text code>media</Text> 层内文件与 manifest 请用侧栏 <strong>多媒体存储</strong> 或 <Text code>/api/v1/media</Text>{' '}
+            维护；本页仅维护其<strong>空子目录</strong>结构（勿删 <Text code>objects/</Text> 或 <Text code>manifest.json</Text>）。
           </Paragraph>
         }
       />

@@ -1,4 +1,4 @@
-export type LayerName = 'raw' | 'wiki' | 'schema'
+export type LayerName = 'raw' | 'wiki' | 'schema' | 'media'
 
 export interface HealthResponse {
   status: string
@@ -165,6 +165,70 @@ export interface DialogueRecallScanRequest {
   context_budget_chars?: number
 }
 
+export interface MediaRef {
+  code: string
+  mime: string
+  title?: string | null
+  size: number
+}
+
+export interface MediaListItem {
+  code: string
+  mime: string
+  size: number
+  title?: string | null
+  original_name?: string | null
+  created_at: string
+  sha256: string
+}
+
+export interface MediaListResponse {
+  items: MediaListItem[]
+  count: number
+  bytes_total: number
+}
+
+export interface MediaBackrefEntry {
+  wiki_path: string
+  heading_path: string
+}
+
+export interface MediaBackrefsResponse {
+  code: string
+  entries: MediaBackrefEntry[]
+  message: string
+}
+
+/** POST /api/v1/media/resolve-from-text */
+export interface MediaResolveFromTextRequest {
+  text?: string
+  codes?: string[]
+}
+
+export interface MediaResolvedItem {
+  code: string
+  registered: boolean
+  mime: string
+  size: number
+  title?: string | null
+  original_name?: string | null
+  created_at: string
+  sha256: string
+}
+
+export interface MediaResolveFromTextResponse {
+  codes: string[]
+  items: MediaResolvedItem[]
+}
+
+export interface MediaUploadResponse {
+  code: string
+  deduplicated: boolean
+  mime: string
+  size: number
+  message: string
+}
+
 /** 仅召回 API（/dialogue/recall） */
 export type DialogueRecallRequest = DialogueRecallScanRequest
 
@@ -176,6 +240,8 @@ export interface DialogueRecallHit {
   path: string
   score: number
   snippet: string
+  /** 标题路径「父 > 子」；无标题切块时为空 */
+  heading_path?: string
 }
 
 /** 与 DialogueRecallLaneStatus 一致：BM25 / 向量单路状态 */
@@ -192,6 +258,8 @@ export interface DialogueRecallResponse {
   query_terms: string[]
   files_scanned: number
   recall_hits: DialogueRecallHit[]
+  /** 各命中片段解析出的媒体，按命中顺序合并、按 code 去重 */
+  merged_media: MediaRef[]
   bm25: DialogueRecallLaneStatus
   vector: DialogueRecallLaneStatus
   injected_context: string
@@ -207,6 +275,8 @@ export interface DialogueRecallTestResponse {
   query_terms: string[]
   files_scanned: number
   recall_hits: DialogueRecallHit[]
+  /** 各命中片段解析出的媒体，按命中顺序合并、按 code 去重 */
+  merged_media: MediaRef[]
   bm25: DialogueRecallLaneStatus
   vector: DialogueRecallLaneStatus
   injected_context: string

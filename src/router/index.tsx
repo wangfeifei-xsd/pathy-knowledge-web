@@ -9,6 +9,7 @@ import { StorageStructure } from '../pages/StorageStructure'
 import { CompileTask } from '../pages/llmTasks/CompileTask'
 import { LintReport } from '../pages/llmTasks/LintReport'
 import { PolishTextPage } from '../pages/llmTasks/PolishTextPage'
+import { MediaLibrary } from '../pages/media/MediaLibrary'
 import { ModelSettings } from '../pages/ModelSettings'
 import { SimpleModelSettings } from '../pages/SimpleModelSettings'
 
@@ -20,6 +21,7 @@ const router = createHashRouter([
       { index: true, element: <Home /> },
       { path: 'layers', element: <Layers /> },
       { path: 'storage/structure', element: <StorageStructure /> },
+      { path: 'storage/media', element: <MediaLibrary /> },
       { path: 'tasks', element: <Navigate to="/tasks/compile" replace /> },
       { path: 'tasks/compile', element: <CompileTask /> },
       { path: 'tasks/lint', element: <LintReport /> },
