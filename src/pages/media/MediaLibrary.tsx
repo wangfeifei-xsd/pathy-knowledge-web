@@ -1,5 +1,7 @@
 import {
   CopyOutlined,
+  DownloadOutlined,
+  ImportOutlined,
   LinkOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -22,11 +24,18 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadProps } from 'antd/es/upload/interface'
+import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import type { Key } from 'react'
 import { api, apiErrorDetail } from '../../api/client'
 import { mediaBinaryUrl } from '../../api/mediaUrls'
-import type { MediaBackrefsResponse, MediaListItem, MediaListResponse, MediaUploadResponse } from '../../api/types'
+import type {
+  MediaBackrefsResponse,
+  MediaImportZipResponse,
+  MediaListItem,
+  MediaListResponse,
+  MediaUploadResponse,
+} from '../../api/types'
 
 const { Paragraph, Text } = Typography
 
@@ -34,6 +43,24 @@ function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   return `${(n / (1024 * 1024)).toFixed(2)} MB`
+}
+
+function parseDispositionFilename(cd: string | undefined): string | undefined {
+  if (!cd) return undefined
+  const m = /filename\*=UTF-8''([^;\n]+)|filename="([^"]+)"/i.exec(cd)
+  if (m?.[1]) return decodeURIComponent(m[1].replace(/^"+|"+$/g, ''))
+  if (m?.[2]) return m[2]
+  return undefined
+}
+
+function triggerDownloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function isImageMime(m: string): boolean {
@@ -56,6 +83,11 @@ export function MediaLibrary() {
   const [backrefLoading, setBackrefLoading] = useState(false)
   const [preview, setPreview] = useState<{ code: string; mime: string } | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [exportBusy, setExportBusy] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importTargetDir, setImportTargetDir] = useState('')
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -143,6 +175,83 @@ export function MediaLibrary() {
     }
     const text = selectedRowKeys.map((k) => `![[MEDIA:${k}]]`).join('  ')
     void copy(text, `已复制 ${selectedRowKeys.length} 个 wiki 占位符`)
+  }
+
+  const exportSelectedZip = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先勾选要导出的资源')
+      return
+    }
+    setExportBusy(true)
+    try {
+      const codes = selectedRowKeys.map(String)
+      const res = await api.post<Blob>('/api/v1/media/export-zip', { codes }, { responseType: 'blob' })
+      const blob = res.data
+      const cd = res.headers['content-disposition'] ?? res.headers['Content-Disposition']
+      const name = parseDispositionFilename(typeof cd === 'string' ? cd : undefined) ?? 'pathy-media-export.zip'
+      triggerDownloadBlob(blob, name)
+      message.success(`已开始下载：${name}`)
+    } catch (e) {
+      if (axios.isAxiosError(e) && e.response?.data instanceof Blob) {
+        try {
+          const t = await e.response.data.text()
+          const j = JSON.parse(t) as { detail?: unknown }
+          const d = j.detail
+          message.error(typeof d === 'string' ? d : '导出失败')
+        } catch {
+          message.error(apiErrorDetail(e) ?? '导出失败')
+        }
+      } else {
+        message.error(apiErrorDetail(e) ?? '导出失败')
+      }
+      console.error(e)
+    } finally {
+      setExportBusy(false)
+    }
+  }
+
+  const submitImportZip = async () => {
+    if (!importFile) {
+      message.warning('请选择 zip 文件')
+      return
+    }
+    setImportBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      const t = importTargetDir.trim()
+      if (t) fd.append('target_dir', t)
+      const { data } = await api.post<MediaImportZipResponse>('/api/v1/media/import-zip', fd)
+      message.success(data.message)
+      const errs = data.results.filter((r) => r.status === 'error')
+      if (errs.length > 0) {
+        Modal.warning({
+          title: '部分条目失败',
+          width: 640,
+          content: (
+            <Table
+              size="small"
+              pagination={{ pageSize: 8 }}
+              rowKey={(_, i) => String(i)}
+              dataSource={errs}
+              columns={[
+                { title: 'source', dataIndex: 'source_code', key: 's', ellipsis: true },
+                { title: '说明', dataIndex: 'detail', key: 'd', ellipsis: true },
+              ]}
+            />
+          ),
+        })
+      }
+      setImportOpen(false)
+      setImportFile(null)
+      setImportTargetDir('')
+      void loadList()
+    } catch (e) {
+      message.error(apiErrorDetail(e) ?? '导入失败')
+      console.error(e)
+    } finally {
+      setImportBusy(false)
+    }
   }
 
   const uploadProps: UploadProps = {
@@ -307,7 +416,9 @@ export function MediaLibrary() {
             <span>
               对应服务端 <code>data/media/</code>（manifest + <code>objects/</code>）。wiki 中写 Obsidian 风格{' '}
               <code>![[MEDIA:…]]</code> 或 HTML 注释 <code>{'<!-- media:… -->'}</code> 绑定资源。召回结果字段{' '}
-              <code>merged_media</code> 与本表一致；请先执行「重建 wiki 反向索引」再使用「反向引用」。
+              <code>merged_media</code> 与本表一致；请先执行「重建 wiki 反向索引」再使用「反向引用」。支持勾选后「导出所选为
+              ZIP」（含 <code>pathy_media_export.json</code> 与二进制）；「从 ZIP 导入」可将包解回当前库，并可指定{' '}
+              <code>media/objects/</code> 下的子目录归类落盘。
             </span>
           }
         />
@@ -317,6 +428,9 @@ export function MediaLibrary() {
           </Button>
           <Button type="primary" ghost onClick={() => void onReindex()} loading={reindexBusy}>
             重建 wiki 反向索引
+          </Button>
+          <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
+            从 ZIP 导入
           </Button>
         </Space>
         {list && (
@@ -352,6 +466,16 @@ export function MediaLibrary() {
           </Button>
           <Button size="small" disabled={selectedRowKeys.length === 0} onClick={copySelectedPlaceholders}>
             复制所选占位符
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            icon={<DownloadOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={exportBusy}
+            onClick={() => void exportSelectedZip()}
+          >
+            导出所选为 ZIP
           </Button>
         </Space>
         <Table<MediaListItem>
@@ -399,6 +523,57 @@ export function MediaLibrary() {
           </Space>
         ) : null}
       </Drawer>
+
+      <Modal
+        open={importOpen}
+        title="从导出 ZIP 导入"
+        okText="开始导入"
+        cancelText="取消"
+        confirmLoading={importBusy}
+        onCancel={() => {
+          if (importBusy) return
+          setImportOpen(false)
+          setImportFile(null)
+          setImportTargetDir('')
+        }}
+        onOk={() => void submitImportZip()}
+        destroyOnClose
+        width={560}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="仅支持本页「导出所选为 ZIP」生成的包（根目录含 pathy_media_export.json）。"
+          />
+          <Form layout="vertical">
+            <Form.Item label="ZIP 文件" required>
+              <Upload
+                maxCount={1}
+                accept=".zip,application/zip"
+                beforeUpload={(f) => {
+                  setImportFile(f)
+                  return false
+                }}
+                onRemove={() => setImportFile(null)}
+              >
+                <Button>选择 zip</Button>
+              </Upload>
+              {importFile ? <Text type="secondary">{importFile.name}</Text> : null}
+            </Form.Item>
+            <Form.Item
+              label="目标子目录（可选）"
+              extra="相对 media/objects，如 project/handbook；留空则使用默认 objects/ab/cd/… 分层。每段仅字母数字下划线连字符。"
+            >
+              <Input
+                placeholder="例如：batch2025"
+                value={importTargetDir}
+                onChange={(e) => setImportTargetDir(e.target.value)}
+              />
+            </Form.Item>
+          </Form>
+        </Space>
+      </Modal>
 
       <Modal
         open={preview != null}

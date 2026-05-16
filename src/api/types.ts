@@ -229,6 +229,25 @@ export interface MediaUploadResponse {
   message: string
 }
 
+/** POST /api/v1/media/export-zip */
+export interface MediaExportZipRequest {
+  codes: string[]
+}
+
+/** POST /api/v1/media/import-zip */
+export interface MediaImportZipRow {
+  source_code: string
+  result_code: string
+  status: string
+  detail: string
+}
+
+export interface MediaImportZipResponse {
+  results: MediaImportZipRow[]
+  message: string
+  target_dir_normalized: string
+}
+
 /** 仅召回 API（/dialogue/recall） */
 export type DialogueRecallRequest = DialogueRecallScanRequest
 
