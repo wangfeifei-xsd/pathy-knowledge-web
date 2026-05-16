@@ -1,5 +1,6 @@
 import {
   CopyOutlined,
+  DeleteOutlined,
   DownloadOutlined,
   ImportOutlined,
   LinkOutlined,
@@ -17,6 +18,7 @@ import {
   Form,
   Input,
   Modal,
+  Popconfirm,
   Space,
   Table,
   Typography,
@@ -31,6 +33,8 @@ import { api, apiErrorDetail } from '../../api/client'
 import { mediaBinaryUrl } from '../../api/mediaUrls'
 import type {
   MediaBackrefsResponse,
+  MediaDeleteBatchResponse,
+  MediaDeleteOneResponse,
   MediaImportZipResponse,
   MediaListItem,
   MediaListResponse,
@@ -88,6 +92,7 @@ export function MediaLibrary() {
   const [importTargetDir, setImportTargetDir] = useState('')
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importBusy, setImportBusy] = useState(false)
+  const [batchDeleteBusy, setBatchDeleteBusy] = useState(false)
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -254,6 +259,71 @@ export function MediaLibrary() {
     }
   }
 
+  const deleteOneMedia = async (code: string) => {
+    try {
+      const { data } = await api.delete<MediaDeleteOneResponse>(`/api/v1/media/${encodeURIComponent(code)}`)
+      message.success(data.message)
+      setSelectedRowKeys((prev) => prev.filter((k) => String(k) !== code))
+      void loadList()
+    } catch (e) {
+      message.error(apiErrorDetail(e) ?? '删除失败')
+      console.error(e)
+    }
+  }
+
+  const confirmBatchDelete = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先勾选要删除的资源')
+      return
+    }
+    const n = selectedRowKeys.length
+    Modal.confirm({
+      title: `确定删除选中的 ${n} 条媒体？`,
+      content:
+        '将移除 manifest 登记；若无其他条目共用磁盘路径则删除对象文件，并清除该 code 在反向索引中的记录。wiki 正文中的占位符不会自动删除，请自行清理。',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchDeleteBusy(true)
+        try {
+          const { data } = await api.post<MediaDeleteBatchResponse>('/api/v1/media/batch-delete', {
+            codes: selectedRowKeys.map(String),
+          })
+          message.success(data.message)
+          const deleted = new Set(data.results.filter((r) => r.status === 'deleted').map((r) => r.code))
+          setSelectedRowKeys((prev) => prev.filter((k) => !deleted.has(String(k))))
+          const others = data.results.filter((r) => r.status !== 'deleted')
+          if (others.length > 0) {
+            Modal.warning({
+              title: '部分条目未删除',
+              width: 560,
+              content: (
+                <Table
+                  size="small"
+                  pagination={{ pageSize: 8 }}
+                  rowKey={(_, i) => String(i)}
+                  dataSource={others}
+                  columns={[
+                    { title: 'code', dataIndex: 'code', key: 'c', ellipsis: true },
+                    { title: '状态', dataIndex: 'status', key: 's', width: 120 },
+                    { title: '说明', dataIndex: 'detail', key: 'd', ellipsis: true },
+                  ]}
+                />
+              ),
+            })
+          }
+          void loadList()
+        } catch (e) {
+          message.error(apiErrorDetail(e) ?? '批量删除失败')
+          console.error(e)
+        } finally {
+          setBatchDeleteBusy(false)
+        }
+      },
+    })
+  }
+
   const uploadProps: UploadProps = {
     name: 'file',
     multiple: true,
@@ -354,7 +424,7 @@ export function MediaLibrary() {
     {
       title: '操作',
       key: 'actions',
-      width: 280,
+      width: 360,
       fixed: 'right',
       render: (_, row) => (
         <Space
@@ -362,7 +432,7 @@ export function MediaLibrary() {
           wrap
           title={
             rowActionsLocked
-              ? '已勾选行时请使用上方「复制所选…」；取消勾选后可使用行内操作'
+              ? '已勾选行时请使用上方「复制所选…」「批量删除」等；取消勾选后可使用行内操作'
               : undefined
           }
         >
@@ -399,6 +469,18 @@ export function MediaLibrary() {
           >
             反向引用
           </Button>
+          <Popconfirm
+            title="确定删除该媒体？"
+            description="移除登记；无其他条目共用文件时删除对象。wiki 占位符需自行清理。"
+            okText="删除"
+            okButtonProps={{ danger: true }}
+            cancelText="取消"
+            onConfirm={() => void deleteOneMedia(row.code)}
+          >
+            <Button size="small" danger type="primary" ghost icon={<DeleteOutlined />} disabled={rowActionsLocked}>
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -418,7 +500,7 @@ export function MediaLibrary() {
               <code>![[MEDIA:…]]</code> 或 HTML 注释 <code>{'<!-- media:… -->'}</code> 绑定资源。召回结果字段{' '}
               <code>merged_media</code> 与本表一致；请先执行「重建 wiki 反向索引」再使用「反向引用」。支持勾选后「导出所选为
               ZIP」（含 <code>pathy_media_export.json</code> 与二进制）；「从 ZIP 导入」可将包解回当前库，并可指定{' '}
-              <code>media/objects/</code> 下的子目录归类落盘。
+              <code>media/objects/</code> 下的子目录归类落盘。支持单行或勾选后批量删除（manifest + 条件允许时删对象文件）。
             </span>
           }
         />
@@ -477,12 +559,22 @@ export function MediaLibrary() {
           >
             导出所选为 ZIP
           </Button>
+          <Button
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={batchDeleteBusy}
+            onClick={() => confirmBatchDelete()}
+          >
+            批量删除
+          </Button>
         </Space>
         <Table<MediaListItem>
           rowKey="code"
           loading={loading}
           size="small"
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1180 }}
           dataSource={list?.items ?? []}
           columns={columns}
           rowSelection={{

@@ -248,6 +248,33 @@ export interface MediaImportZipResponse {
   target_dir_normalized: string
 }
 
+/** POST /api/v1/media/batch-delete */
+export interface MediaDeleteBatchRequest {
+  codes: string[]
+}
+
+export interface MediaDeleteBatchRow {
+  code: string
+  status: string
+  removed_file: boolean
+  detail: string
+}
+
+export interface MediaDeleteBatchResponse {
+  results: MediaDeleteBatchRow[]
+  deleted_count: number
+  not_found_count: number
+  message: string
+}
+
+/** DELETE /api/v1/media/{code} */
+export interface MediaDeleteOneResponse {
+  code: string
+  deleted: boolean
+  removed_file: boolean
+  message: string
+}
+
 /** 仅召回 API（/dialogue/recall） */
 export type DialogueRecallRequest = DialogueRecallScanRequest
 
