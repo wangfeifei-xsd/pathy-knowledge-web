@@ -156,7 +156,7 @@ function mapFolderNodeToTreeSelect(n: DataFolderTreeNode): { value: string; titl
 
 export function Layers() {
   const { message } = App.useApp()
-  const [layer, setLayer] = useState<LayerName>('raw')
+  const [layer, setLayer] = useState<LayerName>('wiki')
   const [prefix, setPrefix] = useState('')
   const [entries, setEntries] = useState<DirEntry[]>([])
   const [listLoading, setListLoading] = useState(false)
