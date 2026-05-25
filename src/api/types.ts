@@ -180,6 +180,8 @@ export interface MediaListItem {
   original_name?: string | null
   created_at: string
   sha256: string
+  /** 所属 media 子目录（rel_storage 去掉末尾 aa/bb/<code>.<ext>）；空表示默认 objects/ 分层 */
+  folder: string
 }
 
 export interface MediaListResponse {
@@ -245,7 +247,12 @@ export interface MediaImportZipRow {
 export interface MediaImportZipResponse {
   results: MediaImportZipRow[]
   message: string
+  /** 兼容旧字段：归一化的 target_dir（objects/ 下子目录） */
   target_dir_normalized: string
+  /** 归一化的 media/ 子路径（含首段，含 'objects' 段）；空表示默认 objects/aa/bb/… */
+  target_folder_normalized: string
+  /** 非致命提示，如同时提供 target_dir 与 target_folder */
+  warning: string
 }
 
 /** POST /api/v1/media/batch-delete */

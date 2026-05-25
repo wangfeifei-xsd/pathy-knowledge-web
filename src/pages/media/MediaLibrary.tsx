@@ -19,19 +19,28 @@ import {
   Input,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Table,
+  TreeSelect,
   Typography,
   Upload,
 } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
+import type { ColumnsType, TableProps } from 'antd/es/table'
 import type { UploadProps } from 'antd/es/upload/interface'
+
+interface FolderTreeNode {
+  value: string
+  title: string
+  children: FolderTreeNode[]
+}
 import axios from 'axios'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Key } from 'react'
 import { api, apiErrorDetail } from '../../api/client'
 import { mediaBinaryUrl } from '../../api/mediaUrls'
 import type {
+  DataFolderTreeNode,
   MediaBackrefsResponse,
   MediaDeleteBatchResponse,
   MediaDeleteOneResponse,
@@ -75,6 +84,29 @@ function isVideoMime(m: string): boolean {
   return /^video\//i.test(m)
 }
 
+/** 媒体内容寻址目录（aa/bb，code 前 4 个十六进制位）会成为目录树中的噪声节点，从选择器里隐藏 */
+const SHA_DIR_RE = /^[0-9a-f]{2}$/i
+
+const ROOT_FOLDER_VALUE = '__media_root__'
+
+/** 把后端 DataFolderTreeNode 转成 antd TreeSelect 节点：
+ *  - 层根节点（path==''）value = ROOT_FOLDER_VALUE，提示走默认 objects/aa/bb/…
+ *  - 其它节点 value = 去掉尾部斜杠的相对路径（如 'objects'、'HSYJY'、'albums/2025'）
+ *  - 过滤掉名字像 aa/bb 这种内容寻址前缀（避免界面被噪声淹没）
+ */
+function buildFolderTreeOption(n: DataFolderTreeNode): FolderTreeNode {
+  const isRoot = n.path === ''
+  const value = isRoot ? ROOT_FOLDER_VALUE : n.path.replace(/\/$/, '')
+  const visibleChildren = n.children
+    .filter((c) => !SHA_DIR_RE.test(c.title))
+    .map(buildFolderTreeOption)
+  return {
+    value,
+    title: isRoot ? `${n.title}（默认 objects/aa/bb/…）` : n.path.replace(/\/$/, ''),
+    children: visibleChildren,
+  }
+}
+
 export function MediaLibrary() {
   const { message } = App.useApp()
   const [list, setList] = useState<MediaListResponse | null>(null)
@@ -89,10 +121,13 @@ export function MediaLibrary() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const [exportBusy, setExportBusy] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
-  const [importTargetDir, setImportTargetDir] = useState('')
+  const [importTargetFolder, setImportTargetFolder] = useState<string>(ROOT_FOLDER_VALUE)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importBusy, setImportBusy] = useState(false)
   const [batchDeleteBusy, setBatchDeleteBusy] = useState(false)
+  const [folderTree, setFolderTree] = useState<DataFolderTreeNode | null>(null)
+  const [folderFilter, setFolderFilter] = useState<string>('__all__')
+  const [mediaTablePage, setMediaTablePage] = useState({ current: 1, pageSize: 20 })
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -108,9 +143,74 @@ export function MediaLibrary() {
     }
   }, [message])
 
+  const loadFolderTree = useCallback(async () => {
+    try {
+      const { data } = await api.get<DataFolderTreeNode>('/api/v1/data-structure/tree/media', {
+        params: { max_depth: 3 },
+      })
+      setFolderTree(data)
+    } catch (e) {
+      console.error('加载 media 目录树失败', e)
+      setFolderTree(null)
+    }
+  }, [])
+
   useEffect(() => {
     void loadList()
   }, [loadList])
+
+  useEffect(() => {
+    void loadFolderTree()
+  }, [loadFolderTree])
+
+  const folderTreeData = useMemo<FolderTreeNode[]>(
+    () => (folderTree ? [buildFolderTreeOption(folderTree)] : []),
+    [folderTree],
+  )
+
+  /** 列表中实际出现过的 folder 取值集合（用于上方过滤下拉） */
+  const folderFilterOptions = useMemo(() => {
+    const items = list?.items ?? []
+    const counts = new Map<string, number>()
+    for (const it of items) {
+      const key = it.folder ?? ''
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    const opts: { value: string; label: string }[] = [
+      { value: '__all__', label: `全部（${items.length}）` },
+    ]
+    Array.from(counts.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([k, n]) => {
+        opts.push({ value: k || '__empty__', label: `${k || '(未归类)'}（${n}）` })
+      })
+    return opts
+  }, [list])
+
+  const filteredItems = useMemo<MediaListItem[]>(() => {
+    const items = list?.items ?? []
+    if (folderFilter === '__all__') return items
+    if (folderFilter === '__empty__') return items.filter((it) => !it.folder)
+    return items.filter((it) => it.folder === folderFilter)
+  }, [list, folderFilter])
+
+  const mediaTotalRows = filteredItems.length
+  const mediaMaxPage = Math.max(1, Math.ceil(mediaTotalRows / mediaTablePage.pageSize) || 1)
+
+  useEffect(() => {
+    if (mediaTablePage.current > mediaMaxPage) {
+      setMediaTablePage((p) => ({ ...p, current: mediaMaxPage }))
+    }
+  }, [mediaMaxPage, mediaTablePage.current])
+
+  const onMediaTableChange: TableProps<MediaListItem>['onChange'] = (pag) => {
+    const nextSize = pag.pageSize ?? mediaTablePage.pageSize
+    const sizeChanged = nextSize !== mediaTablePage.pageSize
+    setMediaTablePage({
+      current: sizeChanged ? 1 : (pag.current ?? 1),
+      pageSize: nextSize,
+    })
+  }
 
   useEffect(() => {
     if (!list) return
@@ -224,10 +324,11 @@ export function MediaLibrary() {
     try {
       const fd = new FormData()
       fd.append('file', importFile)
-      const t = importTargetDir.trim()
-      if (t) fd.append('target_dir', t)
+      const folderVal = importTargetFolder === ROOT_FOLDER_VALUE ? '' : importTargetFolder.trim()
+      if (folderVal) fd.append('target_folder', folderVal)
       const { data } = await api.post<MediaImportZipResponse>('/api/v1/media/import-zip', fd)
       message.success(data.message)
+      if (data.warning) message.warning(data.warning)
       const errs = data.results.filter((r) => r.status === 'error')
       if (errs.length > 0) {
         Modal.warning({
@@ -249,8 +350,9 @@ export function MediaLibrary() {
       }
       setImportOpen(false)
       setImportFile(null)
-      setImportTargetDir('')
+      setImportTargetFolder(ROOT_FOLDER_VALUE)
       void loadList()
+      void loadFolderTree()
     } catch (e) {
       message.error(apiErrorDetail(e) ?? '导入失败')
       console.error(e)
@@ -418,6 +520,14 @@ export function MediaLibrary() {
       width: 96,
       render: (s: number) => formatBytes(s),
     },
+    {
+      title: '菜单',
+      dataIndex: 'folder',
+      key: 'folder',
+      width: 160,
+      ellipsis: true,
+      render: (f: string) => (f ? <Text code>{f}</Text> : <Text type="secondary">—</Text>),
+    },
     { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true, render: (t) => t || '—' },
     { title: '原始文件名', dataIndex: 'original_name', key: 'original_name', ellipsis: true },
     { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 200, ellipsis: true },
@@ -542,6 +652,19 @@ export function MediaLibrary() {
           </Space>
         </Card>
         <Space wrap style={{ marginBottom: 8 }}>
+          <Text type="secondary">菜单筛选</Text>
+          <Select
+            size="small"
+            style={{ minWidth: 220 }}
+            value={folderFilter}
+            onChange={(v) => {
+              setFolderFilter(v)
+              setMediaTablePage((p) => ({ ...p, current: 1 }))
+            }}
+            options={folderFilterOptions}
+            showSearch
+            optionFilterProp="label"
+          />
           <Text type="secondary">已选 {selectedRowKeys.length} 条</Text>
           <Button size="small" icon={<CopyOutlined />} disabled={selectedRowKeys.length === 0} onClick={copySelectedCodes}>
             复制所选 code
@@ -574,15 +697,23 @@ export function MediaLibrary() {
           rowKey="code"
           loading={loading}
           size="small"
-          scroll={{ x: 1180 }}
-          dataSource={list?.items ?? []}
+          scroll={{ x: 1340 }}
+          dataSource={filteredItems}
           columns={columns}
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
             preserveSelectedRowKeys: true,
           }}
-          pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+          pagination={{
+            current: mediaTablePage.current,
+            pageSize: mediaTablePage.pageSize,
+            total: mediaTotalRows,
+            showSizeChanger: true,
+            pageSizeOptions: ['20', '50', '100', '200'],
+            showTotal: (t) => `共 ${t} 条`,
+          }}
+          onChange={onMediaTableChange}
         />
       </Card>
 
@@ -626,7 +757,7 @@ export function MediaLibrary() {
           if (importBusy) return
           setImportOpen(false)
           setImportFile(null)
-          setImportTargetDir('')
+          setImportTargetFolder(ROOT_FOLDER_VALUE)
         }}
         onOk={() => void submitImportZip()}
         destroyOnClose
@@ -654,13 +785,23 @@ export function MediaLibrary() {
               {importFile ? <Text type="secondary">{importFile.name}</Text> : null}
             </Form.Item>
             <Form.Item
-              label="目标子目录（可选）"
-              extra="相对 media/objects，如 project/handbook；留空则使用默认 objects/ab/cd/… 分层。每段仅字母数字下划线连字符。"
+              label="目标菜单（media/ 下子目录）"
+              extra={
+                <span>
+                  从已存在的 <Text code>media/</Text> 子目录中选；选择「层根目录」走默认 <Text code>objects/aa/bb/…</Text>{' '}
+                  分层落盘。若想新建一个菜单，请先到「<Text strong>存储结构</Text>」页在 media 层根下新增子目录后回来选。
+                </span>
+              }
             >
-              <Input
-                placeholder="例如：batch2025"
-                value={importTargetDir}
-                onChange={(e) => setImportTargetDir(e.target.value)}
+              <TreeSelect
+                value={importTargetFolder}
+                onChange={(v) => setImportTargetFolder(v ?? ROOT_FOLDER_VALUE)}
+                treeData={folderTreeData}
+                treeDefaultExpandAll
+                showSearch
+                treeNodeFilterProp="title"
+                style={{ width: '100%' }}
+                placeholder="选择目标菜单"
               />
             </Form.Item>
           </Form>
