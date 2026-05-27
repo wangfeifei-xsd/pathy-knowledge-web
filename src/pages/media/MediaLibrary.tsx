@@ -113,6 +113,7 @@ export function MediaLibrary() {
   const [loading, setLoading] = useState(false)
   const [reindexBusy, setReindexBusy] = useState(false)
   const [uploadTitle, setUploadTitle] = useState('')
+  const [uploadTargetFolder, setUploadTargetFolder] = useState<string>(ROOT_FOLDER_VALUE)
   const [backrefOpen, setBackrefOpen] = useState(false)
   const [backrefCode, setBackrefCode] = useState<string | null>(null)
   const [backrefData, setBackrefData] = useState<MediaBackrefsResponse | null>(null)
@@ -146,7 +147,7 @@ export function MediaLibrary() {
   const loadFolderTree = useCallback(async () => {
     try {
       const { data } = await api.get<DataFolderTreeNode>('/api/v1/data-structure/tree/media', {
-        params: { max_depth: 3 },
+        params: { max_depth: 32, max_nodes: 2000 },
       })
       setFolderTree(data)
     } catch (e) {
@@ -436,6 +437,8 @@ export function MediaLibrary() {
       fd.append('file', file as Blob)
       const t = uploadTitle.trim()
       if (t) fd.append('title', t)
+      const folderVal = uploadTargetFolder === ROOT_FOLDER_VALUE ? '' : uploadTargetFolder.trim()
+      if (folderVal) fd.append('target_folder', folderVal)
       try {
         const { data } = await api.post<MediaUploadResponse>('/api/v1/media/upload', fd)
         onSuccess?.(data)
@@ -633,7 +636,27 @@ export function MediaLibrary() {
         )}
         <Card type="inner" title="上传" size="small" style={{ marginBottom: 16 }}>
           <Space direction="vertical" style={{ width: '100%' }}>
-            <Form layout="inline">
+            <Form layout="vertical">
+              <Form.Item
+                label="目标目录（media/ 下子目录）"
+                extra={
+                  <span>
+                    从已存在的 <Text code>media/</Text> 子目录中选；选择「层根目录」走默认{' '}
+                    <Text code>objects/aa/bb/…</Text> 分层落盘。
+                  </span>
+                }
+              >
+                <TreeSelect
+                  value={uploadTargetFolder}
+                  onChange={(v) => setUploadTargetFolder(v ?? ROOT_FOLDER_VALUE)}
+                  treeData={folderTreeData}
+                  treeDefaultExpandAll
+                  showSearch
+                  treeNodeFilterProp="title"
+                  style={{ width: '100%', maxWidth: 480 }}
+                  placeholder="选择目标目录"
+                />
+              </Form.Item>
               <Form.Item label="标题（可选）">
                 <Input
                   placeholder="写入 manifest，便于识别"
