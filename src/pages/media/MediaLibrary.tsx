@@ -643,11 +643,14 @@ export function MediaLibrary() {
                 />
               </Form.Item>
             </Form>
-            <Upload {...uploadProps} accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov">
+            <Upload
+              {...uploadProps}
+              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov,application/vnd.android.package-archive,.apk"
+            >
               <Button icon={<UploadOutlined />}>选择文件并上传</Button>
             </Upload>
             <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
-              允许：png / jpg / webp / gif / mp4 / webm / mov；大小与总配额由服务端配置。
+              允许：png / jpg / webp / gif / mp4 / webm / mov / apk；大小与总配额由服务端配置。
             </Paragraph>
           </Space>
         </Card>
