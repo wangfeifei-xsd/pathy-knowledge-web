@@ -7,6 +7,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $scriptDir
 
 Write-Host "==> Starting pathy-knowledge-web on port $Port" -ForegroundColor Cyan
 Write-Host "==> VITE_DEV_PROXY_TARGET = $ApiTarget" -ForegroundColor Cyan
