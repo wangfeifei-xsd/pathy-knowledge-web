@@ -357,11 +357,11 @@ export function Layers() {
     }
     setWikiLocateLoading(true)
     try {
-      const wiki_prefix =
-        wikiLocateOnlyCurrentDir && browseDirKey ? browseDirKey : undefined
+      const wiki_prefixes =
+        wikiLocateOnlyCurrentDir && browseDirKey ? [browseDirKey] : undefined
       const payload: DialogueRecallRequest = {
         query: q,
-        wiki_prefix: wiki_prefix || undefined,
+        wiki_prefixes,
         max_files: 120,
         bm25_top_n: 20,
         vector_top_n: 20,

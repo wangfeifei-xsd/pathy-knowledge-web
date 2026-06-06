@@ -4,11 +4,12 @@ import { api, apiErrorDetail } from '../../api/client'
 import type { DialogueRecallHit, DialogueRecallRequest, DialogueRecallResponse } from '../../api/types'
 import { InjectedContextMediaPanel } from './InjectedContextMediaPanel'
 import { RecallLaneSummary } from './recallLaneUi'
+import { WikiPrefixMultiSelect } from './WikiPrefixMultiSelect'
 
 const { Paragraph } = Typography
 
 const SCAN_DEFAULTS = {
-  wiki_prefix: '',
+  wiki_prefixes: [] as string[],
   max_files: 80,
   bm25_top_n: 10,
   vector_top_n: 10,
@@ -29,7 +30,7 @@ export function NaturalLanguageRecall() {
     try {
       const payload: DialogueRecallRequest = {
         query: v.query,
-        wiki_prefix: v.wiki_prefix || undefined,
+        wiki_prefixes: v.wiki_prefixes?.length ? v.wiki_prefixes : undefined,
         max_files: v.max_files,
         bm25_top_n: v.bm25_top_n,
         vector_top_n: v.vector_top_n,
@@ -83,8 +84,8 @@ export function NaturalLanguageRecall() {
                 label: '可选参数（wiki 前缀、双路 topN、topK 与分块）',
                 children: (
                   <>
-                    <Form.Item name="wiki_prefix" label="wiki 子路径前缀（可选）">
-                      <Input placeholder="留空表示扫描整个 wiki；可填子目录如 notes/" />
+                    <Form.Item name="wiki_prefixes" label="wiki 子目录（可选，可多选）">
+                      <WikiPrefixMultiSelect />
                     </Form.Item>
                     <Space wrap style={{ width: '100%' }}>
                       <Form.Item name="max_files" label="最多扫描文件数" style={{ minWidth: 160 }}>

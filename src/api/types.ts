@@ -156,7 +156,7 @@ export interface PolishTextResponse {
 /** 与服务端 DialogueRecallBaseParams 一致：双路召回扫描参数（不含 LLM system） */
 export interface DialogueRecallScanRequest {
   query: string
-  wiki_prefix?: string
+  wiki_prefixes?: string[]
   max_files?: number
   bm25_top_n?: number
   vector_top_n?: number
