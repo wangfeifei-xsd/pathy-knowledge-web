@@ -16,7 +16,18 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 
 **[pathy-knowledge-server README](https://github.com/wangfeifei-xsd/pathy-knowledge-server)**
 
-本地开发时请先按该文档启动 API 服务，再在本目录执行 `npm install` 与 `npm run dev`。
+本地开发时先启动 API 服务，再启动前端。
+
+### macOS / Linux 后台启停
+
+在本项目根目录执行以下命令。首次启动会用 npm 安装前端依赖。
+
+```bash
+./run-scripts/start.sh
+./run-scripts/stop.sh
+```
+
+默认访问 `http://127.0.0.1:5173/wiki/`，日志写入 `run-scripts/.runtime/service.log`。可通过 `HOST` 和 `PORT` 指定监听地址和端口。后端端口有变动时，启动前端时一并设置代理目标，例如 `PORT=5174 VITE_DEV_PROXY_TARGET=http://127.0.0.1:8766 ./run-scripts/start.sh`。
 
 ### 应用根路径（`base`：默认 `/wiki/`）
 
@@ -48,7 +59,7 @@ Karpathy 式知识库的 **Web 管理端**：对接同仓库下的 `pathy-knowle
 在 Windows 项目目录中，使用系统自带 PowerShell 执行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\start-web.ps1 -Port 5174 -ApiTarget "http://127.0.0.1:8766"
+powershell -ExecutionPolicy Bypass -File .\run-scripts\start-web.ps1 -Port 5174 -ApiTarget "http://127.0.0.1:8766"
 ```
 
 启动后浏览器访问前端地址（默认带 `/wiki/` 子路径）：`http://127.0.0.1:5174/wiki/`；若启动时指定了 `-Base /` 则为根路径 `http://127.0.0.1:5174/`。
